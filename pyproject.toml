@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nmetrics"
+version = "0.1.0"
+authors = [
+  { name="Manuel Narbona Sarria", email="manuel.narsa@gmail.com" },
+]
+description = "N Framework: The Exact Thermodynamics of Consensus"
+license = {text = "GNU General Public License v3.0"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Science/Research",
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "numpy>=1.20.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0"
+]
+
+[project.urls]
+Homepage = "https://github.com/manuel-narsa/n-metrics"
+Documentation = "https://github.com/manuel-narsa/n-metrics/wiki"
+Source = "https://github.com/manuel-narsa/n-metrics"
+Issues = "https://github.com/manuel-narsa/n-metrics/issues"
+
+[project.scripts]
+# --- Comandos Globales (Tablas Comparativas) ---
+nmetrics-interval = "nmetrics.cli.interval.analizar_csv_interval:main"
+nmetrics-nominal  = "nmetrics.cli.nominal.analizar_csv_nominal:main"
+nmetrics-ordinal  = "nmetrics.cli.ordinal.analizar_csv_ordinal:main"
+
+# --- Comandos Individuales: Topología Intervalar ---
+nmetrics-ni    = "nmetrics.cli.interval.ni_analizar_csv:main"
+nmetrics-aki   = "nmetrics.cli.interval.aki_analizar_csv:main"
+nmetrics-icc21 = "nmetrics.cli.interval.icc21_analizar_csv:main"
+
+# --- Comandos Individuales: Topología Nominal ---
+nmetrics-nn  = "nmetrics.cli.nominal.nn_analizar_csv:main"
+nmetrics-akn = "nmetrics.cli.nominal.akn_analizar_csv:main"
+nmetrics-kf  = "nmetrics.cli.nominal.kf_analizar_csv:main"
+
+# --- Comandos Individuales: Topología Ordinal ---
+nmetrics-no  = "nmetrics.cli.ordinal.no_analizar_csv:main"
+nmetrics-ako = "nmetrics.cli.ordinal.ako_analizar_csv:main"
+nmetrics-w   = "nmetrics.cli.ordinal.w_analizar_csv:main"
+
+# --- Comandos Analíticos (Cobertura y Stress Testing) ---
+nmetrics-ni-cob = "nmetrics.cli.interval.ni_cobertura_cmd:main"
+nmetrics-aki-cob = "nmetrics.cli.interval.aki_cobertura_cmd:main"
+nmetrics-icc21-cob = "nmetrics.cli.interval.icc21_cobertura_cmd:main"
+
+nmetrics-nn-cob  = "nmetrics.cli.nominal.nn_cobertura_cmd:main"
+nmetrics-akn-cob = "nmetrics.cli.nominal.akn_cobertura_cmd:main"
+nmetrics-kf-cob  = "nmetrics.cli.nominal.kf_cobertura_cmd:main"
+
+nmetrics-no-cob  = "nmetrics.cli.ordinal.no_cobertura_cmd:main"
+nmetrics-ako-cob = "nmetrics.cli.ordinal.ako_cobertura_cmd:main"
+nmetrics-w-cob   = "nmetrics.cli.ordinal.w_cobertura_cmd:main"
+
+nmetrics-interval-comp = "nmetrics.cli.interval.comparativa_global_cmd:main"
+nmetrics-nominal-comp  = "nmetrics.cli.nominal.comparativa_global_cmd:main"
+nmetrics-ordinal-comp  = "nmetrics.cli.ordinal.comparativa_global_cmd:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["nmetrics*"]

@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it as below."
+authors:
+  - family-names: "Narbona Sarria"
+    given-names: "Manuel"
+title: "N-Metrics: The Exact Thermodynamics of Consensus"
+version: 0.1.0
+date-released: 2026-05-01
+url: "https://github.com/manuel-narsa/n-metrics"
