@@ -48,6 +48,15 @@ def main():
     parser.add_argument("-d", "--decimales", type=int, default=0, help="Decimales (default: 0 para Ordinal)")
     parser.add_argument("-o", "--output", type=str, default="comparativa_ordinal.csv", help="CSV de salida")
 
+    # --- NUEVOS: PARÁMETROS DINÁMICOS DE RUIDO (Familia NO) ---
+    parser.add_argument("--nocn", type=float, default=0.05, help="Proporción de ruido en Casi Nulo (default: 0.05)")
+    parser.add_argument("--nort", type=float, default=0.60, help="Proporción de sujetos alterados en Razonable (default: 0.60)")
+    parser.add_argument("--norv", type=float, default=0.60, help="Proporción de jueces alterados en Razonable (default: 0.60)")
+    parser.add_argument("--nocpt", type=float, default=0.30, help="Proporción de sujetos alterados en Casi Perfecto (default: 0.30)")
+    parser.add_argument("--nocpv", type=float, default=0.30, help="Proporción de jueces alterados en Casi Perfecto (default: 0.30)")
+    parser.add_argument("--nocit", type=float, default=0.10, help="Proporción de sujetos alterados en Casi Idéntico (default: 0.10)")
+    parser.add_argument("--nociv", type=float, default=0.10, help="Proporción de jueces alterados en Casi Idéntico (default: 0.10)")
+
     args = parser.parse_args()
 
     escenarios = ["Casi Nulo", "Aleatorio", "Razonable", "Casi Perfecto", "Casi Idéntico"]
@@ -67,7 +76,16 @@ def main():
         }
         
         for i in range(args.experimentos):
-            matriz_empirica = generar_matriz_dinamica(args.muestra, args.jueces, args.escala, esc, tipo_escala='ordinal', decimales=args.decimales)
+            # --- NUEVO: INYECCIÓN DINÁMICA DE PARÁMETROS DE RUIDO ---
+            matriz_empirica = generar_matriz_dinamica(
+                args.muestra, args.jueces, args.escala, esc, 
+                tipo_escala='ordinal', 
+                decimales=args.decimales,
+                NOCN=args.nocn, 
+                NORT=args.nort, NORV=args.norv, 
+                NOCPT=args.nocpt, NOCPV=args.nocpv, 
+                NOCIT=args.nocit, NOCIV=args.nociv
+            )
             
             # --- NO ---
             no_muestra, no_pob_real, inf_no, sup_no, *_ = no_core.calcular_estadisticas_no(matriz_empirica, args.replicas, args.escala, 'SP')

@@ -48,6 +48,15 @@ def main():
     parser.add_argument("-d", "--decimales", type=int, default=0, help="Decimales (default: 0 para Nominal)")
     parser.add_argument("-o", "--output", type=str, default="comparativa_nominal.csv", help="CSV de salida")
 
+    # --- NUEVOS: PARÁMETROS DINÁMICOS DE RUIDO (Familia NN) ---
+    parser.add_argument("--nncn", type=float, default=0.05, help="Proporción de ruido en Casi Nulo (default: 0.05)")
+    parser.add_argument("--nnrt", type=float, default=0.50, help="Proporción de sujetos alterados en Razonable (default: 0.50)")
+    parser.add_argument("--nnrv", type=float, default=0.50, help="Proporción de jueces alterados en Razonable (default: 0.50)")
+    parser.add_argument("--nncpt", type=float, default=0.30, help="Proporción de sujetos alterados en Casi Perfecto (default: 0.30)")
+    parser.add_argument("--nncpv", type=float, default=0.20, help="Proporción de jueces alterados en Casi Perfecto (default: 0.20)")
+    parser.add_argument("--nncit", type=float, default=0.10, help="Proporción de sujetos alterados en Casi Idéntico (default: 0.10)")
+    parser.add_argument("--nnciv", type=float, default=0.10, help="Proporción de jueces alterados en Casi Idéntico (default: 0.10)")
+
     args = parser.parse_args()
 
     escenarios = ["Casi Nulo", "Aleatorio", "Razonable", "Casi Perfecto", "Casi Idéntico"]
@@ -67,7 +76,16 @@ def main():
         }
         
         for i in range(args.experimentos):
-            matriz_empirica = generar_matriz_dinamica(args.muestra, args.jueces, args.escala, esc, tipo_escala='categórica', decimales=args.decimales)
+            # --- NUEVO: INYECCIÓN DINÁMICA DE PARÁMETROS DE RUIDO ---
+            matriz_empirica = generar_matriz_dinamica(
+                args.muestra, args.jueces, args.escala, esc, 
+                tipo_escala='categórica', 
+                decimales=args.decimales,
+                NNCN=args.nncn, 
+                NNRT=args.nnrt, NNRV=args.nnrv, 
+                NNCPT=args.nncpt, NNCPV=args.nncpv, 
+                NNCIT=args.nncit, NNCIV=args.nnciv
+            )
             
             # --- NN ---
             nn_muestra, nn_pob_real, inf_nn, sup_nn, *_ = nn_core.calcular_estadisticas_nn(matriz_empirica, args.replicas, args.escala, 'SP')

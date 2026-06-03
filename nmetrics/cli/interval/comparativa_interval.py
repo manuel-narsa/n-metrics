@@ -49,6 +49,15 @@ def main():
     parser.add_argument("-d", "--decimales", type=int, default=1, help="Decimales de ruido paramétrico (default: 1)")
     parser.add_argument("-o", "--output", type=str, default="comparativa_interval.csv", help="CSV de salida")
 
+    # --- NUEVOS: PARÁMETROS DINÁMICOS DE RUIDO (Familia NI) ---
+    parser.add_argument("--nicn", type=float, default=0.05, help="Proporción de ruido en Casi Nulo (default: 0.05)")
+    parser.add_argument("--nirt", type=float, default=0.50, help="Proporción de sujetos alterados en Razonable (default: 0.50)")
+    parser.add_argument("--nirv", type=float, default=0.50, help="Proporción de jueces alterados en Razonable (default: 0.50)")
+    parser.add_argument("--nicpt", type=float, default=0.30, help="Proporción de sujetos alterados en Casi Perfecto (default: 0.30)")
+    parser.add_argument("--nicpv", type=float, default=0.20, help="Proporción de jueces alterados en Casi Perfecto (default: 0.20)")
+    parser.add_argument("--nicit", type=float, default=0.10, help="Proporción de sujetos alterados en Casi Idéntico (default: 0.10)")
+    parser.add_argument("--niciv", type=float, default=0.10, help="Proporción de jueces alterados en Casi Idéntico (default: 0.10)")
+
     args = parser.parse_args()
 
     escenarios = ["Casi Nulo", "Aleatorio", "Razonable", "Casi Perfecto", "Casi Idéntico"]
@@ -68,7 +77,16 @@ def main():
         }
         
         for i in range(args.experimentos):
-            matriz_empirica = generar_matriz_dinamica(args.muestra, args.jueces, args.escala, esc, tipo_escala='paramétrica', decimales=args.decimales)
+            # --- NUEVO: INYECCIÓN DINÁMICA DE PARÁMETROS DE RUIDO ---
+            matriz_empirica = generar_matriz_dinamica(
+                args.muestra, args.jueces, args.escala, esc, 
+                tipo_escala='paramétrica', 
+                decimales=args.decimales,
+                NICN=args.nicn, 
+                NIRT=args.nirt, NIRV=args.nirv, 
+                NICPT=args.nicpt, NICPV=args.nicpv, 
+                NICIT=args.nicit, NICIV=args.niciv
+            )
             
             # --- NI ---
             ni_muestra, ni_pob_real, inf_ni, sup_ni, *_ = ni_core.calcular_estadisticas_ni(matriz_empirica, args.replicas, args.escala, 'SP')

@@ -1,14 +1,14 @@
 """
-Módulo Nominal de nmetrics.
-Expone las funciones principales para calcular NN, Alpha de Krippendorff Nominal (AKN) 
-y Kappa de Fleiss (KF).
+Módulo Nominal de n-metrics.
+Contiene los núcleos termodinámicos (Marco N) y estimadores clásicos
+para variables categóricas puras sin orden (escala nominal).
 """
 
-# 1. Importaciones del motor Natural Nominal (NN)
+# 1. Importaciones del motor Termodinámico (Marco N)
 from .nn_core import (
-    calcular_estadisticas_nn,
     detectar_anomalias_nn,
     calcular_azar_termodinamico_nn,
+    calcular_estadisticas_nn_unificada,
     calcular_percentil_universal_nn
 )
 
@@ -24,11 +24,10 @@ from .kf_core import (
     calcular_kf_poblacion_asintotica
 )
 
-# Definimos explícitamente qué se exporta si alguien usa "from nmetrics.nominal import *"
 __all__ = [
-    "calcular_estadisticas_nn",
     "detectar_anomalias_nn",
     "calcular_azar_termodinamico_nn",
+    "calcular_estadisticas_nn_unificada",
     "calcular_percentil_universal_nn",
     "calcular_estadisticas_akn",
     "calcular_akn_poblacion_asintotica",

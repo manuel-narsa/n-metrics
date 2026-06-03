@@ -100,14 +100,9 @@ def calcular_percentil_universal_nn(nn_empirico, m_jueces, k_escala=5):
     for p in percentiles:
         if p['nn'] <= nn_empirico:
             nn_lower = p['nn']; p_lower = p['p_sup']
-        else:
-            break  # 🚀 VITAL: Romper cuando superamos el límite inferior
-            
     for p in reversed(percentiles):
         if p['nn'] >= nn_empirico:
             nn_upper = p['nn']; p_upper = p['p_sup']
-        else:
-            break  # 🚀 VITAL: Romper cuando bajamos del límite superior
             
     if nn_lower is None: return 0.0
     if nn_upper is None: return 100.0
@@ -129,10 +124,11 @@ def calcular_poblacion_real_teorica(m_jueces, k_escala=5):
     mu_poblacional = np.sum(acuerdos * multiplicidades) / np.sum(multiplicidades)
     return float(np.sqrt(mu_poblacional))
 
-# ==============================================================================
-# MOTOR DE INFERENCIA UNIFICADA (Producto Punto - Big Data Ready)
-# ==============================================================================
 def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
+    """
+    Motor universal condensado y vectorizado para Escala Nominal (NN).
+    Calcula Muestra, Población (SP) e IC mediante SIMULACIÓN PONDERADA Multinomial en O(1).
+    """
     estados_lista = list(dict_estados.keys())
     f_t = np.array(list(dict_estados.values()), dtype=float)
     n_total = int(np.sum(f_t))
@@ -142,15 +138,13 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     except ValueError:
         raise ValueError("La matriz contiene datos no numéricos.")
 
-    U, m = X_estados.shape
-
     # ---------------------------------------------------------
     # PRE-CÁLCULO DEL ACUERDO ESTATAL NOMINAL (1 Sola Vez)
     # ---------------------------------------------------------
     m_valid = np.sum(~np.isnan(X_estados), axis=1)
     max_coincidencias = m_valid * (m_valid - 1) / 2
 
-    counts = np.zeros((U, k_escala))
+    counts = np.zeros((len(X_estados), k_escala))
     X_clip = np.floor(X_estados + 0.5)
     X_clip = np.clip(X_clip, 1, k_escala)
     for k_val in range(1, k_escala + 1):
@@ -180,36 +174,22 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # 2. NN POBLACIÓN (Corrección Termodinámica Exacta)
     # ---------------------------------------------------------
     counts_rounded = np.round(counts, 4)
-    
-    # 🚀 CORRECCIÓN 1: ORDENAR PARA AGRUPAR EN LA "FIRMA" PURA
-    counts_sorted = np.sort(counts_rounded, axis=1)[:, ::-1]
-    
-    unique_counts, inverse_idx = np.unique(counts_sorted, axis=0, return_inverse=True)
+    # ELIMINADO: counts_sorted = np.sort(counts_rounded, axis=1)
+    # Agrupamos por la firma exacta para emparejar con el cálculo multinomial
+    unique_counts, inverse_idx = np.unique(counts_rounded, axis=0, return_inverse=True)
     
     f_M = np.zeros(len(unique_counts))
     np.add.at(f_M, inverse_idx, f_t)
     f_M_mapped = f_M[inverse_idx]
 
-    # 🚀 CORRECCIÓN 2: MASA TERMODINÁMICA COMPLETA (Jueces + Categorías)
-    # A) Permutaciones de los Jueces (m! / c_i!)
-    log_perm_jueces = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
-    
-    # B) Permutaciones de las Categorías (k! / f_c!)
-    f_c = np.zeros((U, m + 1))
-    for c in range(m + 1):
-        f_c[:, c] = np.sum(counts == c, axis=1)
-        
-    log_asign_cat = gammaln(k_escala + 1) - np.sum(gammaln(f_c + 1), axis=1)
-    
-    # C) Multiplicidad Total
-    log_omega = log_perm_jueces + log_asign_cat
+    # Multiplicidad Termodinámica Nominal: m! / (c1! * c2! * ... * ck!)
+    log_omega = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
     omega_teorico = np.exp(log_omega - np.max(log_omega))
-    # ---------------------------------------------------------
 
     # Peso Poblacional SP
     w_pob = np.where((m_valid > 1) & (f_M_mapped > 0), f_t * (omega_teorico / f_M_mapped), 0.0)
     sum_wpob = np.sum(w_pob)
-    w_pob = w_pob / sum_wpob if sum_wpob > 0 else np.ones(U) / U
+    w_pob = w_pob / sum_wpob if sum_wpob > 0 else np.ones(len(X_estados)) / len(X_estados)
 
     nn_poblacion = _nn_desde_pesos(w_pob)[0]
 
@@ -218,7 +198,7 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # ---------------------------------------------------------
     safe_n = max(n_total, 2)
     
-    # Agrupamos los U estados en ~15 niveles únicos de acuerdo
+    # 🚀 SOLUCIÓN BIG DATA: Agrupamos los U estados en ~15 niveles únicos de acuerdo
     acuerdos_unicos, inverse_acuerdo = np.unique(np.round(acuerdo, 8), return_inverse=True)
     w_pob_grouped = np.zeros(len(acuerdos_unicos))
     np.add.at(w_pob_grouped, inverse_acuerdo, w_pob)

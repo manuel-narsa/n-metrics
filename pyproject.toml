@@ -3,8 +3,8 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "nmetrics"
-version = "0.1.0"
+name = "n-metrics"
+version = "0.6.0"
 authors = [
   { name="Manuel Narbona Sarria", email="manuel.narsa@gmail.com" },
 ]
@@ -64,9 +64,9 @@ nmetrics-no-cob  = "nmetrics.cli.ordinal.no_cobertura_cmd:main"
 nmetrics-ako-cob = "nmetrics.cli.ordinal.ako_cobertura_cmd:main"
 nmetrics-w-cob   = "nmetrics.cli.ordinal.w_cobertura_cmd:main"
 
-nmetrics-interval-comp = "nmetrics.cli.interval.comparativa_global_cmd:main"
-nmetrics-nominal-comp  = "nmetrics.cli.nominal.comparativa_global_cmd:main"
-nmetrics-ordinal-comp  = "nmetrics.cli.ordinal.comparativa_global_cmd:main"
+nmetrics-interval-comp = "nmetrics.cli.interval.comparativa_interval:main"
+nmetrics-nominal-comp  = "nmetrics.cli.nominal.comparativa_nominal:main"
+nmetrics-ordinal-comp  = "nmetrics.cli.ordinal.comparativa_ordinal:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

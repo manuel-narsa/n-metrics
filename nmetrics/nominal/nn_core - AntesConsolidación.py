@@ -36,8 +36,125 @@ def _build_macrostate_dictionary_nn(m_jueces, k_escala):
     return macro_dict
 
 # ==============================================================================
-# 2. MOTOR TERMODINÁMICO DE SIMULACIÓN PONDERADA
+# 2. MOTOR TERMODINÁMICO DE SIMULACIÓN PONDERADA (IPW)
 # ==============================================================================
+def _calcular_pesos_termodinamicos_sujetos_nn(X_3d, k_escala):
+    S, n, m = X_3d.shape
+    counts = np.zeros((S, n, k_escala))
+    
+    # Limpiamos los datos y contamos frecuencias
+    X_cat = np.floor(X_3d + 0.5)
+    X_cat = np.clip(X_cat, 1, k_escala)
+    
+    for k_val in range(1, k_escala + 1):
+        counts[:, :, k_val-1] = np.sum(X_cat == k_val, axis=2)
+        
+    m_valid = np.sum(~np.isnan(X_3d), axis=2)
+    
+    # 1. Permutaciones de los jueces: m! / (c1! c2! ...)
+    log_m_fact = gammaln(m_valid + 1)
+    log_denom_jueces = np.sum(gammaln(counts + 1), axis=2)
+    log_perm_jueces = log_m_fact - log_denom_jueces
+    
+    # 2. Asignación de categorías: k! / (f0! f1! ... fm!)
+    f_c = np.zeros((S, n, m + 1))
+    for c in range(m + 1):
+        f_c[:, :, c] = np.sum(counts == c, axis=2)
+        
+    log_k_fact = gammaln(k_escala + 1)
+    log_denom_cat = np.sum(gammaln(f_c + 1), axis=2)
+    log_asign_cat = log_k_fact - log_denom_cat
+    
+    # 3. Multiplicidad Termodinámica Teórica
+    log_omega = log_perm_jueces + log_asign_cat
+    max_log = np.max(log_omega, axis=1, keepdims=True) # Previene desbordamiento
+    omega_teorico = np.exp(log_omega - max_log)
+    
+    # 4. CORRECCIÓN IPW (Frecuencia Empírica de Filas)
+    counts_sorted = np.sort(counts, axis=2)
+    
+    f_emp = np.ones((S, n))
+    for s in range(S):
+        _, inverse_idx, freq = np.unique(counts_sorted[s], axis=0, return_inverse=True, return_counts=True)
+        f_emp[s] = freq[inverse_idx]
+        
+    # Ponderación Inversa (IPW)
+    omega_corregido = omega_teorico / f_emp
+    
+    # Normalización al 100%
+    sum_omega = np.sum(omega_corregido, axis=1, keepdims=True)
+    pesos = np.where(sum_omega > 0, omega_corregido / sum_omega, 1.0 / n)
+    
+    return pesos
+
+def _compute_nn_sp_vectorized(X_3d, w_pesos_filas, k_escala):
+    S, n, m = X_3d.shape
+    m_valid = np.sum(~np.isnan(X_3d), axis=2)
+    
+    counts = np.zeros((S, n, k_escala))
+    X_clip = np.floor(X_3d + 0.5)
+    X_clip = np.clip(X_clip, 1, k_escala)
+    for k_val in range(1, k_escala + 1):
+        counts[:, :, k_val-1] = np.sum(X_clip == k_val, axis=2)
+        
+    coincidencias_row = np.sum(counts * (counts - 1) / 2, axis=2)
+    max_coincidencias = m_valid * (m_valid - 1) / 2
+    
+    acuerdo_row = np.divide(coincidencias_row, max_coincidencias,
+                            out=np.full_like(coincidencias_row, np.nan, dtype=float),
+                            where=max_coincidencias > 0)
+    
+    valid_rows = ~np.isnan(acuerdo_row) & (m_valid > 1)
+    pesos_validos = np.where(valid_rows, w_pesos_filas, 0.0)
+    
+    sum_pesos = np.sum(pesos_validos, axis=1, keepdims=True)
+    pesos_norm = np.where(sum_pesos > 0, pesos_validos / sum_pesos, 0.0)
+    
+    mu_global = np.sum(acuerdo_row * pesos_norm, axis=1)
+    var_global = np.sum(pesos_norm * (acuerdo_row - mu_global[:, None])**2, axis=1)
+    sigma_global = np.sqrt(var_global)
+    
+    return np.sqrt(np.maximum(mu_global * (1 - sigma_global), 0.0))
+
+# ==============================================================================
+# 3. INTERFAZ ESTADÍSTICA PRINCIPAL
+# ==============================================================================
+def calcular_estadisticas_nn(matriz_entrada, S_replicas, k_escala=5, metodo_ic='SP'):
+    X = np.array(matriz_entrada, dtype=float)
+    n, m = X.shape
+    
+    # Acuerdo muestral (Pesos planos)
+    w_plano = np.ones((1, n)) / n 
+    nn_muestra = _compute_nn_sp_vectorized(X[None, :, :], w_plano, k_escala)[0]
+    
+    if metodo_ic == 'SP':
+        # 1. Calculamos la ponderación termodinámica (IPW)
+        w_termo = _calcular_pesos_termodinamicos_sujetos_nn(X[None, :, :], k_escala)
+        p_i = w_termo[0] 
+        
+        # 2. Calculamos el acuerdo poblacional proyectado
+        nn_ponderado = _compute_nn_sp_vectorized(X[None, :, :], p_i[None, :], k_escala)[0]
+        
+        # 3. SIMULACIÓN PONDERADA
+        indices = np.random.choice(n, size=(S_replicas, n), replace=True, p=p_i)
+        X_replicas = X[indices]
+        w_flat_replicas = np.ones((S_replicas, n)) / n 
+        nn_replicas = _compute_nn_sp_vectorized(X_replicas, w_flat_replicas, k_escala)
+        
+    else:
+        nn_ponderado = nn_muestra # Fallback si BC clásico
+        indices = np.random.choice(n, size=(S_replicas, n), replace=True)
+        X_replicas = X[indices]
+        w_flat_replicas = np.ones((S_replicas, n)) / n
+        nn_replicas = _compute_nn_sp_vectorized(X_replicas, w_flat_replicas, k_escala)
+    
+    mascara_validos = ~np.isnan(nn_replicas)
+    nn_replicas_valid = nn_replicas[mascara_validos]
+    X_replicas_valid = X_replicas[mascara_validos]
+    
+    if len(nn_replicas_valid) < 2: 
+        return float(nn_muestra), float(nn_ponderado), np.nan, np.nan, nn_replicas_valid, X_replicas_valid
+    return float(nn_muestra), float(nn_ponderado), float(np.percentile(nn_replicas_valid, 2.5)), float(np.percentile(nn_replicas_valid, 97.5)), nn_replicas_valid, X_replicas_valid
 
 def detectar_anomalias_nn(matriz_entrada, k_escala=5, umbral_sigma=1.0):
     X = np.array(matriz_entrada, dtype=float)
@@ -100,14 +217,9 @@ def calcular_percentil_universal_nn(nn_empirico, m_jueces, k_escala=5):
     for p in percentiles:
         if p['nn'] <= nn_empirico:
             nn_lower = p['nn']; p_lower = p['p_sup']
-        else:
-            break  # 🚀 VITAL: Romper cuando superamos el límite inferior
-            
     for p in reversed(percentiles):
         if p['nn'] >= nn_empirico:
             nn_upper = p['nn']; p_upper = p['p_sup']
-        else:
-            break  # 🚀 VITAL: Romper cuando bajamos del límite superior
             
     if nn_lower is None: return 0.0
     if nn_upper is None: return 100.0
@@ -129,10 +241,11 @@ def calcular_poblacion_real_teorica(m_jueces, k_escala=5):
     mu_poblacional = np.sum(acuerdos * multiplicidades) / np.sum(multiplicidades)
     return float(np.sqrt(mu_poblacional))
 
-# ==============================================================================
-# MOTOR DE INFERENCIA UNIFICADA (Producto Punto - Big Data Ready)
-# ==============================================================================
 def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
+    """
+    Motor universal condensado y vectorizado para Escala Nominal (NN).
+    Calcula Muestra, Población (SP) e IC mediante SIMULACIÓN PONDERADA Multinomial en O(1).
+    """
     estados_lista = list(dict_estados.keys())
     f_t = np.array(list(dict_estados.values()), dtype=float)
     n_total = int(np.sum(f_t))
@@ -142,15 +255,13 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     except ValueError:
         raise ValueError("La matriz contiene datos no numéricos.")
 
-    U, m = X_estados.shape
-
     # ---------------------------------------------------------
     # PRE-CÁLCULO DEL ACUERDO ESTATAL NOMINAL (1 Sola Vez)
     # ---------------------------------------------------------
     m_valid = np.sum(~np.isnan(X_estados), axis=1)
     max_coincidencias = m_valid * (m_valid - 1) / 2
 
-    counts = np.zeros((U, k_escala))
+    counts = np.zeros((len(X_estados), k_escala))
     X_clip = np.floor(X_estados + 0.5)
     X_clip = np.clip(X_clip, 1, k_escala)
     for k_val in range(1, k_escala + 1):
@@ -180,36 +291,22 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # 2. NN POBLACIÓN (Corrección Termodinámica Exacta)
     # ---------------------------------------------------------
     counts_rounded = np.round(counts, 4)
-    
-    # 🚀 CORRECCIÓN 1: ORDENAR PARA AGRUPAR EN LA "FIRMA" PURA
-    counts_sorted = np.sort(counts_rounded, axis=1)[:, ::-1]
-    
-    unique_counts, inverse_idx = np.unique(counts_sorted, axis=0, return_inverse=True)
+    # ELIMINADO: counts_sorted = np.sort(counts_rounded, axis=1)
+    # Agrupamos por la firma exacta para emparejar con el cálculo multinomial
+    unique_counts, inverse_idx = np.unique(counts_rounded, axis=0, return_inverse=True)
     
     f_M = np.zeros(len(unique_counts))
     np.add.at(f_M, inverse_idx, f_t)
     f_M_mapped = f_M[inverse_idx]
 
-    # 🚀 CORRECCIÓN 2: MASA TERMODINÁMICA COMPLETA (Jueces + Categorías)
-    # A) Permutaciones de los Jueces (m! / c_i!)
-    log_perm_jueces = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
-    
-    # B) Permutaciones de las Categorías (k! / f_c!)
-    f_c = np.zeros((U, m + 1))
-    for c in range(m + 1):
-        f_c[:, c] = np.sum(counts == c, axis=1)
-        
-    log_asign_cat = gammaln(k_escala + 1) - np.sum(gammaln(f_c + 1), axis=1)
-    
-    # C) Multiplicidad Total
-    log_omega = log_perm_jueces + log_asign_cat
+    # Multiplicidad Termodinámica Nominal: m! / (c1! * c2! * ... * ck!)
+    log_omega = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
     omega_teorico = np.exp(log_omega - np.max(log_omega))
-    # ---------------------------------------------------------
 
     # Peso Poblacional SP
     w_pob = np.where((m_valid > 1) & (f_M_mapped > 0), f_t * (omega_teorico / f_M_mapped), 0.0)
     sum_wpob = np.sum(w_pob)
-    w_pob = w_pob / sum_wpob if sum_wpob > 0 else np.ones(U) / U
+    w_pob = w_pob / sum_wpob if sum_wpob > 0 else np.ones(len(X_estados)) / len(X_estados)
 
     nn_poblacion = _nn_desde_pesos(w_pob)[0]
 
@@ -218,7 +315,7 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # ---------------------------------------------------------
     safe_n = max(n_total, 2)
     
-    # Agrupamos los U estados en ~15 niveles únicos de acuerdo
+    # 🚀 SOLUCIÓN BIG DATA: Agrupamos los U estados en ~15 niveles únicos de acuerdo
     acuerdos_unicos, inverse_acuerdo = np.unique(np.round(acuerdo, 8), return_inverse=True)
     w_pob_grouped = np.zeros(len(acuerdos_unicos))
     np.add.at(w_pob_grouped, inverse_acuerdo, w_pob)

@@ -1,0 +1,179 @@
+import numpy as np
+import pandas as pd
+import math
+import itertools
+from collections import Counter, defaultdict
+from functools import lru_cache
+
+class NCore:
+    def __init__(self, topologia, m_jueces, k_escala):
+        self.topologia = topologia
+        self.m = int(m_jueces)
+        self.k = int(k_escala)
+
+    # =========================================================================
+    # 1. KERNELS TOPOLÓGICOS (Las "Leyes Físicas" de la Escala)
+    # =========================================================================
+    def _kernel_ni(self, valores):
+        """Kernel Intervalar: Acuerdo por reducción de Varianza"""
+        m_i = len(valores)
+        if m_i < 2: return 0.0
+        sigma = np.std(valores)
+        n_ext1 = m_i // 2
+        n_ext2 = m_i - n_ext1
+        mean_ext = (n_ext1 * 1 + n_ext2 * self.k) / m_i
+        max_sigma = np.sqrt((n_ext1 * (1 - mean_ext)**2 + n_ext2 * (self.k - mean_ext)**2) / m_i)
+        return max(0.0, 1.0 - (sigma / max_sigma)) if max_sigma > 0 else 1.0
+
+    def _kernel_nx(self, valores):
+        """Kernel Nominal/Ordinal: Acuerdo por Coincidencia Exacta (Fleiss/Rangos)"""
+        m_i = len(valores)
+        if m_i < 2: return 0.0
+        max_coinc = m_i * (m_i - 1) / 2
+        _, counts = np.unique(valores, return_counts=True)
+        coinc = sum(c * (c - 1) / 2 for c in counts)
+        return coinc / max_coinc if max_coinc > 0 else 0.0
+
+    def _transformar_ordinal(self, dict_ce_crudo):
+        """Mapea valores brutos a Rangos Densos para la métrica NO"""
+        mapas_rangos = {}
+        for j in range(self.m):
+            valores_j = set(ce[j] for ce in dict_ce_crudo.keys() if j < len(ce) and not pd.isna(ce[j]))
+            valores_ordenados = sorted(list(valores_j))
+            mapas_rangos[j] = {v: rango for rango, v in enumerate(valores_ordenados, start=1)}
+            
+        dict_ce_no = Counter()
+        for ce, frec in dict_ce_crudo.items():
+            ce_rango = []
+            for j in range(self.m):
+                if j < len(ce) and not pd.isna(ce[j]):
+                    ce_rango.append(mapas_rangos[j][ce[j]])
+                else:
+                    ce_rango.append(np.nan)
+            dict_ce_no[tuple(ce_rango)] += frec
+        return dict_ce_no
+
+    # =========================================================================
+    # 2. GENERADOR DEL AZAR UNIVERSAL (Caché Persistente Independiente de n)
+    # =========================================================================
+    @staticmethod
+    @lru_cache(maxsize=128)
+    def _obtener_azar_universal(m, k):
+        """Genera el mapa combinatorio k^m con multiplicidad termodinámica"""
+        fact = [math.factorial(i) for i in range(m + 1)]
+        formas = itertools.combinations_with_replacement(range(1, k + 1), m)
+        dict_azar = {}
+        
+        for forma in formas:
+            counts = {}
+            for x in forma: 
+                counts[x] = counts.get(x, 0) + 1
+            
+            denom = 1.0
+            for c in counts.values(): 
+                denom *= fact[c]
+                
+            multiplicidad = fact[m] / denom
+            dict_azar[tuple(forma)] = multiplicidad
+            
+        return dict_azar
+
+    # =========================================================================
+    # 3. MOTOR DE INFERENCIA UNIFICADO
+    # =========================================================================
+    def procesar(self, dict_ce_crudo):
+        kernel = self._kernel_ni if "Intervalar" in self.topologia else self._kernel_nx
+        
+        # 1. Transformación Estructural
+        dict_empirico = self._transformar_ordinal(dict_ce_crudo) if "Ordinal" in self.topologia else dict_ce_crudo
+        
+        # 2. Evaluación del Consenso Empírico
+        a_locales_emp, f_emp = [], []
+        for ce, frec in dict_empirico.items():
+            v = [x for x in ce if not pd.isna(x)]
+            if len(v) >= 2:
+                a_locales_emp.append(kernel(v))
+                f_emp.append(frec)
+                
+        if not a_locales_emp:
+            return {"consenso": 0.0, "ic_inf": 0.0, "ic_sup": 0.0, "azar": 0.0, "percentil": 0.0}
+            
+        a_arr = np.array(a_locales_emp)
+        f_arr = np.array(f_emp)
+        
+        mu_emp = np.average(a_arr, weights=f_arr)
+        var_emp = np.average((a_arr - mu_emp)**2, weights=f_arr)
+        consenso_real = np.sqrt(max(0.0, mu_emp * (1.0 - np.sqrt(var_emp))))
+        
+        # Error Estándar e Intervalo de Confianza (SP Analítico)
+        err = np.sqrt(var_emp / np.sum(f_arr)) if np.sum(f_arr) > 0 else 0
+        ic_inf = max(0.0, consenso_real - 1.96 * err)
+        ic_sup = min(1.0, consenso_real + 1.96 * err)
+        
+        # 3. Evaluación del Consenso de Azar Universal
+        dict_azar = self._obtener_azar_universal(self.m, self.k)
+        a_locales_azar, f_azar = [], []
+        for ce, frec in dict_azar.items():
+            a_locales_azar.append(kernel(ce))
+            f_azar.append(frec)
+            
+        a_az_arr = np.array(a_locales_azar)
+        f_az_arr = np.array(f_azar)
+        
+        if "Ordinal" in self.topologia:
+            azar_real = np.sqrt(1.0 / self.k) # Valor exacto y simétrico de la topología
+        else:
+            mu_az = np.average(a_az_arr, weights=f_az_arr)
+            var_az = np.average((a_az_arr - mu_az)**2, weights=f_az_arr)
+            azar_real = np.sqrt(max(0.0, mu_az * (1.0 - np.sqrt(var_az))))
+            
+        # 4. Escala de Percentil (Proyección Integral)
+        agrupados = defaultdict(float)
+        total_azar = np.sum(f_az_arr)
+        
+        for a_val, f_val in zip(a_az_arr, f_az_arr):
+            c_val = np.sqrt(a_val) # El consenso termodinámico de un macroestado puro (var=0)
+            agrupados[round(c_val, 6)] += f_val
+            
+        ordenados = sorted(agrupados.items())
+        acumulado = 0.0
+        percentiles = []
+        for c_val, f_val in ordenados:
+            acumulado += f_val
+            percentiles.append((c_val, acumulado / total_azar))
+            
+        c_emp = round(float(consenso_real), 6)
+        p_lower, c_lower = 0.0, 0.0
+        p_upper, c_upper = 1.0, 1.0
+        
+        for c_val, p_sup in percentiles:
+            if c_val <= c_emp: c_lower, p_lower = c_val, p_sup
+        for c_val, p_sup in reversed(percentiles):
+            if c_val >= c_emp: c_upper, p_upper = c_val, p_sup
+                
+        if c_lower == c_upper:
+            perc = p_lower * 100.0
+        else:
+            perc = (p_lower + (p_upper - p_lower) * (c_emp - c_lower) / (c_upper - c_lower)) * 100.0
+            
+        return {
+            "consenso": consenso_real,
+            "ic_inf": ic_inf,
+            "ic_sup": ic_sup,
+            "azar": azar_real,
+            "percentil": perc
+        }
+
+# ==============================================================================
+# ADAPTADOR DE COMPATIBILIDAD PARA TESTS DE ESTRÉS (app.py)
+# ==============================================================================
+def calcular_estadisticas_unificadas(matriz_entrada, topologia, k_escala):
+    """Firma de retrocompatibilidad para Duelos y Cobertura"""
+    m_jueces = matriz_entrada.shape[1]
+    dict_ce = Counter([tuple(x) for x in matriz_entrada])
+    
+    motor = NCore(topologia, m_jueces, k_escala)
+    res = motor.procesar(dict_ce)
+    
+    # Devuelve (Muestra, Poblacion, IC_inf, IC_sup) imitando el formato antiguo
+    return res['consenso'], res['consenso'], res['ic_inf'], res['ic_sup']

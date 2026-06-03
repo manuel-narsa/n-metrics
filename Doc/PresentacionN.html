@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N: El Coeficiente de Concordancia Natural</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Playfair+Display:wght@700&family=Roboto+Mono&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        /* 1. CONFIGURACIÓN BASE */
+        :root {
+            --primary: #003366;    /* Azul Marino Profesional */
+            --secondary: #006633;  /* Verde Esmeralda (Estabilidad) */
+            --accent: #D4AF37;     /* Dorado (Rigor/Excelencia) */
+            --bg: #FFFFFF;
+            --text: #1A1A1A;
+            --light-gray: #F8F9FA;
+            --danger: #e11d48;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: #CBD5E0;
+            display: grid;
+            gap: 20px;
+            place-items: center;
+            padding: 40px 0;
+        }
+
+        .slide-container {
+            background-color: var(--bg);
+            width: 1280px;
+            height: 720px;
+            overflow: hidden;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            font-family: 'Montserrat', sans-serif;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+
+        /* Fondo decorativo */
+        .slide-container::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(0,51,102,0.03) 0%, rgba(0,102,51,0.03) 100%);
+            z-index: 0;
+        }
+
+        .slide-container > * { position: relative; z-index: 1; }
+
+        /* 2. TIPOGRAFÍA */
+        h1 { font-family: 'Playfair Display', serif; font-size: 64px; color: var(--primary); line-height: 1.1; margin-bottom: 20px; }
+        .slide-title { font-family: 'Playfair Display', serif; font-size: 42px; color: var(--primary); margin-bottom: 25px; border-bottom: 3px solid var(--accent); padding-bottom: 10px; }
+        h3 { font-size: 26px; color: var(--secondary); margin-bottom: 15px; }
+        p, li { font-size: 19px; line-height: 1.5; color: var(--text); }
+        .subtitle { font-size: 26px; color: var(--secondary); font-weight: 400; }
+
+        /* 3. LAYOUTS */
+        .content-area { display: flex; flex-direction: column; flex-grow: 1; justify-content: center; width: 100%; padding: 0 70px 30px 70px; }
+        .title-layout { text-align: center; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px; }
+        .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; width: 100%; align-items: start; }
+        .tiled-content { display: flex; gap: 30px; width: 100%; }
+        
+        .tile { flex: 1; background-color: var(--light-gray); padding: 25px; border-radius: 12px; border-left: 6px solid var(--primary); }
+        .tile .icon { font-size: 36px; color: var(--accent); margin-bottom: 15px; }
+        
+        .bullet-list ul { list-style: none; }
+        .bullet-list li { position: relative; padding-left: 35px; margin-bottom: 15px; }
+        .bullet-list i { position: absolute; left: 0; top: 5px; color: var(--secondary); font-size: 20px; }
+
+        /* Fórmulas y Destacados */
+        #formula-container { background: var(--light-gray); padding: 20px; border-radius: 10px; text-align: center; margin: 15px 0; }
+        .highlight-number { font-size: 80px; font-weight: 700; color: var(--primary); line-height: 1; }
+        .quote-layout blockquote { font-family: 'Playfair Display', serif; font-size: 32px; font-style: italic; text-align: center; padding: 0 80px; }
+        .quote-layout cite { display: block; text-align: right; margin-top: 15px; font-weight: bold; color: var(--accent); padding-right: 80px; }
+
+        /* TABLAS DE DATOS (Para la Paradoja) */
+        .data-table { border-collapse: collapse; width: 100%; font-size: 13px; text-align: center; background: #fff; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);}
+        .data-table th, .data-table td { border: 1px solid #555; padding: 4px; }
+        .data-table th { background-color: #84cc16; color: #000; font-weight: bold; } /* Verde claro estilo Excel */
+        .data-table .row-header { background-color: #fef08a; font-weight: bold; } /* Amarillo claro */
+        .data-table .outlier-row { background-color: #fee2e2; }
+        
+        /* Cajas de Resultados */
+        .results-grid { display: grid; grid-template-columns: 1fr 1.5fr; gap: 15px; align-items: end; }
+        
+        .res-table { border-collapse: collapse; width: 100%; font-size: 14px; text-align: center; background: #fff; border: 2px solid #333; }
+        .res-table td, .res-table th { border: 1px solid #333; padding: 4px 8px; }
+        .res-table td:first-child { text-align: left; background: #f8f9fa; font-weight: bold; width: 40%;}
+        
+        .ci-table { border-collapse: collapse; width: 100%; font-size: 14px; text-align: center; background: #fff; border: 2px solid #333;}
+        .ci-table th { font-size: 12px; background: #f8f9fa; border: 1px solid #333; text-transform: uppercase; }
+        .ci-table td { border: 1px solid #333; padding: 4px 8px; }
+        .ci-table .bold-col { font-weight: bold; background: #fef08a; }
+
+    </style>
+</head>
+<body>
+
+<div class="slide-container" id="slide1">
+    <div class="title-layout">
+        <div style="background: var(--accent); height: 5px; width: 100px; margin-bottom: 30px;"></div>
+        <h1>N, el Coeficiente de Concordancia Natural</h1>
+        <p class="subtitle">La Termodinámica Exacta del Consenso</p>
+        <p style="margin-top: 50px; font-weight: bold; color: var(--primary);">Manuel Narbona-Sarria</p>
+        <p>Investigador Independiente | Sevilla, España</p>
+    </div>
+</div>
+
+<div class="slide-container" id="slide2">
+    <div class="content-area">
+        <h2 class="slide-title">Estableciendo el Marco de Trabajo</h2>
+        <p style="font-size: 24px; font-weight: bold; color: var(--primary); margin-bottom: 30px; text-align: center;">¿Qué estamos pretendiendo medir?</p>
+        
+        <div class="tiled-content" style="margin-bottom: 30px;">
+            <div class="tile" style="text-align: center; padding: 40px 20px;">
+                <div class="icon"><i class="fa-solid fa-users-viewfinder"></i></div>
+                <h3 style="font-size: 32px;"><math><mi>m</mi></math> evaluadores</h3>
+            </div>
+            <div class="tile" style="text-align: center; padding: 40px 20px;">
+                <div class="icon"><i class="fa-solid fa-clipboard-user"></i></div>
+                <h3 style="font-size: 32px;">evalúan a <math><mi>n</mi></math> sujetos</h3>
+            </div>
+            <div class="tile" style="text-align: center; padding: 40px 20px;">
+                <div class="icon"><i class="fa-solid fa-ruler"></i></div>
+                <h3 style="font-size: 32px;">escala de <math><mi>k</mi></math> valores</h3>
+            </div>
+        </div>
+
+        <div class="two-column" style="background: var(--light-gray); padding: 30px; border-radius: 12px; border: 1px solid #ddd;">
+            <div class="bullet-list">
+                <h4 style="color: var(--primary); font-size: 20px; margin-bottom: 10px;">La Topología de la Escala puede ser:</h4>
+                <ul>
+                    <li><i class="fa-solid fa-chart-line"></i> <strong>Intervalo o Razón:</strong> Valores métricos (enteros o fraccionarios).</li>
+                    <li><i class="fa-solid fa-tags"></i> <strong>Nominal:</strong> Categorías puras sin orden lógico.</li>
+                    <li><i class="fa-solid fa-layer-group"></i> <strong>Ordinal:</strong> Categorías con orden jerárquico.</li>
+                </ul>
+            </div>
+            <div class="bullet-list">
+                <h4 style="color: var(--primary); font-size: 20px; margin-bottom: 10px;">El Reto de la Realidad Empírica:</h4>
+                <ul>
+                    <li><i class="fa-solid fa-link-slash"></i> <strong>Valores Faltantes:</strong> No todos los sujetos tienen que estar evaluados por todos los evaluadores.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="background: var(--accent); color: #fff; padding: 15px; text-align: center; border-radius: 8px; margin-top: 20px;">
+            <h3 style="color: #fff; margin: 0; font-size: 26px;">Pregunta central: ¿Cuál es el grado real de acuerdo?</h3>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide3">
+    <div class="content-area" style="padding-top: 10px;">
+        <h2 class="slide-title" style="border-bottom-color: var(--danger); color: var(--danger); margin-bottom: 15px;"><i class="fa-solid fa-bolt" style="margin-right: 15px;"></i>Ejemplo Paradójico I: El Colapso de la Varianza</h2>
+        
+        <div class="two-column" style="gap: 25px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column;">
+                <h3 style="font-size: 19px; margin-bottom: 5px; color: var(--primary);">Escenario A: Matriz con Valores Fraccionarios</h3>
+                <p style="font-size: 14px; margin-bottom: 10px;">Alta concordancia global, datos faltantes y un sujeto atípico (A8).</p>
+                
+                <table class="data-table">
+                    <tr><th></th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>P6</th><th>P7</th></tr>
+                    <tr><td class="row-header">A1</td><td>4.0</td><td>4.4</td><td>4.9</td><td>5.0</td><td>4.4</td><td>4.5</td><td>4.0</td></tr>
+                    <tr><td class="row-header">A2</td><td>4.5</td><td></td><td>4.4</td><td>4.6</td><td>5.0</td><td>4.9</td><td>4.5</td></tr>
+                    <tr><td class="row-header">A3</td><td>4.2</td><td>4.8</td><td>4.4</td><td>4.6</td><td>4.6</td><td>4.3</td><td>4.5</td></tr>
+                    <tr><td class="row-header">A4</td><td>4.8</td><td>4.6</td><td>4.2</td><td>4.8</td><td>4.4</td><td>4.7</td><td>4.8</td></tr>
+                    <tr><td class="row-header">A5</td><td>4.1</td><td></td><td>4.5</td><td>4.5</td><td>5.0</td><td>4.6</td><td>4.0</td></tr>
+                    <tr><td class="row-header">A6</td><td>4.0</td><td>4.3</td><td>4.8</td><td>4.5</td><td>4.9</td><td></td><td>5.0</td></tr>
+                    <tr><td class="row-header">A7</td><td>4.6</td><td>4.9</td><td>4.3</td><td></td><td>4.4</td><td>4.0</td><td>4.6</td></tr>
+                    <tr class="outlier-row"><td class="row-header">A8</td><td>1.0</td><td>1.4</td><td>1.9</td><td>2.0</td><td>1.4</td><td>1.5</td><td>1.0</td></tr>
+                </table>
+                
+                <div class="results-grid" style="margin-top: auto;">
+                    <table class="res-table">
+                        <tr><td>AKI</td><td style="background: #fef08a; font-weight: bold;">0.9143</td></tr>
+                        <tr><td>ICC(2,1)</td><td style="background: #fef08a; font-weight: bold;">0.9588</td></tr>
+                    </table>
+                    <table class="ci-table">
+                        <tr><th colspan="3">Intervalo de Confianza</th></tr>
+                        <tr><td>-0.1216</td><td>0.9557</td><td class="bold-col">1.0773</td></tr>
+                        <tr><td>0.8564</td><td>0.9970</td><td class="bold-col">0.1406</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <h3 style="font-size: 19px; margin-bottom: 5px; color: var(--primary);">Escenario B: El Sujeto Discordante es Eliminado</h3>
+                <p style="font-size: 14px; margin-bottom: 10px;">Exactamente los mismos jueces, evaluando a los mismos 7 sujetos.</p>
+                
+                <table class="data-table">
+                    <tr><th></th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>P6</th><th>P7</th></tr>
+                    <tr><td class="row-header">A1</td><td>4.0</td><td>4.4</td><td>4.9</td><td>5.0</td><td>4.4</td><td>4.5</td><td>4.0</td></tr>
+                    <tr><td class="row-header">A2</td><td>4.5</td><td></td><td>4.4</td><td>4.6</td><td>5.0</td><td>4.9</td><td>4.5</td></tr>
+                    <tr><td class="row-header">A3</td><td>4.2</td><td>4.8</td><td>4.4</td><td>4.6</td><td>4.6</td><td>4.3</td><td>4.5</td></tr>
+                    <tr><td class="row-header">A4</td><td>4.8</td><td>4.6</td><td>4.2</td><td>4.8</td><td>4.4</td><td>4.7</td><td>4.8</td></tr>
+                    <tr><td class="row-header">A5</td><td>4.1</td><td></td><td>4.5</td><td>4.5</td><td>5.0</td><td>4.6</td><td>4.0</td></tr>
+                    <tr><td class="row-header">A6</td><td>4.0</td><td>4.3</td><td>4.8</td><td>4.5</td><td>4.9</td><td></td><td>5.0</td></tr>
+                    <tr><td class="row-header">A7</td><td>4.6</td><td>4.9</td><td>4.3</td><td></td><td>4.4</td><td>4.0</td><td>4.6</td></tr>
+                    <tr><td colspan="8" style="height: 23px; border:none; background:transparent;"></td></tr>
+                </table>
+                
+                <div class="results-grid" style="margin-top: auto;">
+                    <table class="res-table" style="border-color: var(--danger); color: var(--danger);">
+                        <tr><td>AKI</td><td style="font-weight: bold;">-0.0794</td></tr>
+                        <tr><td>ICC(2,1)</td><td style="font-weight: bold;">-0.0795</td></tr>
+                    </table>
+                    <table class="ci-table">
+                        <tr><th colspan="3">Intervalo de Confianza</th></tr>
+                        <tr><td>-0.1399</td><td>-0.0406</td><td class="bold-col">0.0993</td></tr>
+                        <tr><td>-0.1621</td><td>0.7603</td><td class="bold-col">0.9224</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div style="background: #fff; padding: 10px; border-left: 5px solid var(--danger); margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; margin: 0; font-weight: bold; color: var(--primary);">
+                Análisis: Al eliminar A8, desaparece la varianza inter-sujetos y los coeficientes colapsan a negativo. Los IC muestran un comportamiento caótico inverso: AKI presenta una amplitud absurda (>1.0) cuando reporta alto acuerdo y colapsa sin él, mientras a ICC le ocurre exactamente lo contrario.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide4">
+    <div class="content-area" style="padding-top: 10px;">
+        <h2 class="slide-title" style="border-bottom-color: var(--danger); color: var(--danger); margin-bottom: 15px;"><i class="fa-solid fa-bolt" style="margin-right: 15px;"></i>Ejemplo Paradójico II: Ceguera Morfológica</h2>
+        
+        <div class="two-column" style="gap: 25px; align-items: stretch;">
+            <div style="display: flex; flex-direction: column;">
+                <h3 style="font-size: 19px; margin-bottom: 5px; color: var(--primary);">Escenario C: Acuerdo al Azar (Ruido)</h3>
+                <p style="font-size: 14px; margin-bottom: 10px;">Todas las categorías de la escala (1-5) presentes en proporción uniforme.</p>
+                
+                <table class="data-table">
+                    <tr><th></th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>P6</th><th>P7</th></tr>
+                    <tr><td class="row-header">A1</td><td>4</td><td>3</td><td>4</td><td>3</td><td>3</td><td>4</td><td>4</td></tr>
+                    <tr><td class="row-header">A2</td><td>5</td><td>5</td><td>3</td><td>5</td><td>2</td><td>5</td><td>1</td></tr>
+                    <tr><td class="row-header">A3</td><td>5</td><td>5</td><td>2</td><td>4</td><td>2</td><td>1</td><td>5</td></tr>
+                    <tr><td class="row-header">A4</td><td>5</td><td>2</td><td>4</td><td>1</td><td>3</td><td>1</td><td>4</td></tr>
+                    <tr><td class="row-header">A5</td><td>2</td><td>1</td><td>1</td><td>4</td><td>4</td><td>2</td><td>2</td></tr>
+                    <tr><td class="row-header">A6</td><td>3</td><td>5</td><td>1</td><td>2</td><td>5</td><td>2</td><td>3</td></tr>
+                    <tr><td class="row-header">A7</td><td>5</td><td>4</td><td>1</td><td>2</td><td>3</td><td>3</td><td>2</td></tr>
+                    <tr><td class="row-header">A8</td><td>2</td><td>3</td><td>5</td><td>1</td><td>2</td><td>3</td><td>1</td></tr>
+                </table>
+                
+                <div class="results-grid" style="margin-top: auto;">
+                    <table class="res-table" style="border-color: var(--danger); color: var(--danger);">
+                        <tr><td>AKI</td><td style="font-weight: bold;">-0.0658</td></tr>
+                        <tr><td>ICC(2,1)</td><td style="font-weight: bold;">-0.0584</td></tr>
+                    </table>
+                    <table class="ci-table">
+                        <tr><th colspan="3">Intervalo de Confianza</th></tr>
+                        <tr><td>-0.1192</td><td>-0.0120</td><td class="bold-col">0.1072</td></tr>
+                        <tr><td>-0.1117</td><td>0.1579</td><td class="bold-col">0.2696</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column;">
+                <h3 style="font-size: 19px; margin-bottom: 5px; color: var(--primary);">Escenario D: Desacuerdo Sistemático</h3>
+                <p style="font-size: 14px; margin-bottom: 10px;">Conflicto polarizado diametralmente (los evaluadores se dividen entre 1 y 5).</p>
+                
+                <table class="data-table">
+                    <tr><th></th><th>P1</th><th>P2</th><th>P3</th><th>P4</th><th>P5</th><th>P6</th><th>P7</th></tr>
+                    <tr><td class="row-header">A1</td><td>5</td><td>5</td><td>1</td><td>1</td><td>1</td><td>5</td><td>1</td></tr>
+                    <tr><td class="row-header">A2</td><td>1</td><td>5</td><td>5</td><td>5</td><td>1</td><td>1</td><td>1</td></tr>
+                    <tr><td class="row-header">A3</td><td>5</td><td>1</td><td>5</td><td>1</td><td>5</td><td>5</td><td>5</td></tr>
+                    <tr><td class="row-header">A4</td><td>1</td><td>5</td><td>5</td><td>1</td><td>1</td><td>5</td><td>5</td></tr>
+                    <tr><td class="row-header">A5</td><td>1</td><td>5</td><td>5</td><td>1</td><td>1</td><td>5</td><td>5</td></tr>
+                    <tr><td class="row-header">A6</td><td>1</td><td>1</td><td>5</td><td>1</td><td>1</td><td>5</td><td>1</td></tr>
+                    <tr><td class="row-header">A7</td><td>5</td><td>1</td><td>1</td><td>1</td><td>5</td><td>1</td><td>1</td></tr>
+                    <tr><td class="row-header">A8</td><td>1</td><td>5</td><td>5</td><td>1</td><td>5</td><td>5</td><td>1</td></tr>
+                </table>
+                
+                <div class="results-grid" style="margin-top: auto;">
+                    <table class="res-table" style="border-color: var(--danger); color: var(--danger);">
+                        <tr><td>AKI</td><td style="font-weight: bold;">-0.0536</td></tr>
+                        <tr><td>ICC(2,1)</td><td style="font-weight: bold;">-0.0465</td></tr>
+                    </table>
+                    <table class="ci-table">
+                        <tr><th colspan="3">Intervalo de Confianza</th></tr>
+                        <tr><td>-0.1224</td><td>-0.0055</td><td class="bold-col">0.1169</td></tr>
+                        <tr><td>-0.1076</td><td>0.1923</td><td class="bold-col">0.2999</td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <div style="background: #fff; padding: 10px; border-left: 5px solid var(--danger); margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <p style="font-size: 16px; margin: 0; font-weight: bold; color: var(--primary);">
+                Análisis: Ni AKI ni ICC son capaces de distinguir entre un acuerdo aleatorio uniforme y un desacuerdo sistemático estructurado. Asignan el mismo grado de "error" al azar puro que a una discrepancia diametralmente polarizada. El algoritmo es ciego ante la estructura del conflicto.
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide5">
+    <div class="content-area">
+        <h2 class="slide-title">La Crisis Topológica de la Fiabilidad</h2>
+        <div class="two-column">
+            <div>
+                <h3>Punto Ciego Estructural</h3>
+                <p>Las métricas del siglo XX (Alpha de Krippendorff, Kappa de Fleiss, ICC) sufren de <strong>ceguera espacial</strong>[cite: 54, 55].</p>
+                <p style="margin-top:15px;">Ignoran la arquitectura del espacio de configuración, operando bajo la ilusión de un continuo empírico inexistente[cite: 56, 102].</p>
+            </div>
+            <div class="bullet-list">
+                <ul>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i> <strong>Paradojas de Alto Acuerdo:</strong> Penalización injusta de paneles expertos por falta de varianza (como acabamos de ver)[cite: 65, 66, 68].</li>
+                    <li><i class="fa-solid fa-circle-nodes"></i> <strong>Dependencia Muestral:</strong> Resultados que varían con el tamaño y la homogeneidad de la muestra[cite: 62, 578].</li>
+                    <li><i class="fa-solid fa-link-slash"></i> <strong>Incomparabilidad:</strong> Imposibilidad de comparar estudios entre diferentes disciplinas o escalas[cite: 69, 79].</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide6">
+    <div class="content-area">
+        <h2 class="slide-title">Del Frecuentismo a la Termodinámica</h2>
+        <div class="tiled-content">
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-cube"></i></div>
+                <h3>Orden Absoluto</h3>
+                <p>Análogo a una estructura cristalina[cite: 122]. Estado de mínima entropía con masa probabilística microscópica[cite: 123].</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-wind"></i></div>
+                <h3>Caos (Ruido)</h3>
+                <p>Análogo a un gas en expansión[cite: 125]. El estado de máxima entropía y el atractor natural del sistema estadístico[cite: 126].</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-calculator"></i></div>
+                <h3>Mecánica Estadística</h3>
+                <p>Modelamos el consenso mediante la topología del espacio de configuración: microestados y macroestados[cite: 21].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide7">
+    <div class="content-area">
+        <h2 class="slide-title">N: La Ecuación Universal de Consenso</h2>
+        <div id="formula-container">
+            <div style="display: math; font-size: 32px;">
+                <math xmlns="http://www.w3.org/1998/Math/MathML" display="block">
+                    <mi>N</mi>
+                    <mo>=</mo>
+                    <msqrt>
+                        <msub>
+                            <mi>&#x3BC;</mi>
+                            <mi>A</mi>
+                        </msub>
+                        <mo>&#x22C5;</mo>
+                        <mo>(</mo>
+                        <mn>1</mn>
+                        <mo>&#x2212;</mo>
+                        <msub>
+                            <mi>&#x3C3;</mi>
+                            <mi>A</mi>
+                        </msub>
+                        <mo>)</mo>
+                    </msqrt>
+                </math>
+            </div>
+        </div>
+        <div class="two-column" style="margin-top: 30px;">
+            <div>
+                <h3>Magnitud del Consenso</h3>
+                <p>La media aritmética de los acuerdos locales (<span><math><msub><mi>&#x3BC;</mi><mi>A</mi></msub></math></span>). Mide la tendencia central de la concordancia entre los jueces[cite: 198].</p>
+            </div>
+            <div>
+                <h3>Estabilidad Estructural</h3>
+                <p>Penalizador de entropía (<span><math><mn>1</mn><mo>-</mo><msub><mi>&#x3C3;</mi><mi>A</mi></msub></math></span>). Garantiza homogeneidad estructural en toda la matriz y detecta ruido asimétrico[cite: 199, 202].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide8">
+    <div class="content-area">
+        <h2 class="slide-title">Un Solo Marco, Tres Topologías</h2>
+        <table style="margin-top: 20px; font-size: 20px;">
+            <thead>
+                <tr>
+                    <th style="background: var(--primary);">Escala</th>
+                    <th style="background: var(--primary);">Métrica</th>
+                    <th style="background: var(--primary);">Foco Topológico</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight: bold;">Nominal</td>
+                    <td><math><msub><mi>N</mi><mi>N</mi></msub></math></td>
+                    <td>Colisiones categóricas isotrópicas (coincidencia pura)[cite: 143, 327].</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Ordinal</td>
+                    <td><math><msub><mi>N</mi><mi>O</mi></msub></math></td>
+                    <td>Jerarquía de rangos densos y firmas combinatorias entrelazadas[cite: 145].</td>
+                </tr>
+                <tr>
+                    <td style="font-weight: bold;">Intervalar</td>
+                    <td><math><msub><mi>N</mi><mi>I</mi></msub></math></td>
+                    <td>Distancias euclídeas, simetrías especulares y penalización por varianza[cite: 141, 303].</td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin-top: 30px; font-style: italic; color: var(--secondary); text-align: center;">N unifica los datos bajo una única ley termodinámica, permitiendo la comparación transversal entre escalas y disciplinas[cite: 256, 450].</p>
+    </div>
+</div>
+
+<div class="slide-container" id="slide9">
+    <div class="content-area">
+        <h2 class="slide-title">Nivel II: Azar por Diseño</h2>
+        <div class="two-column">
+            <div class="bullet-list">
+                <ul>
+                    <li><i class="fa-solid fa-bullseye"></i> <strong>Límite Absoluto:</strong> Calcula el punto exacto de ruido estadístico dictado por el diseño empírico ($n, m, k$)[cite: 164].</li>
+                    <li><i class="fa-solid fa-dna"></i> <strong>Independencia Muestral:</strong> El azar no se estima a partir de la muestra; se deduce analíticamente del espacio hiper-dimensional total[cite: 63, 64].</li>
+                    <li><i class="fa-solid fa-chart-area"></i> <strong>Masa Termodinámica:</strong> Mapeo de cada macroestado a su multiplicidad combinatoria exacta (<math><mi>&#x3A9;</mi></math>)[cite: 153].</li>
+                </ul>
+            </div>
+            <div style="background: var(--light-gray); padding: 30px; border-radius: 15px; border: 2px dashed var(--accent);">
+                <h3>Expectativa Nula Exacta</h3>
+                <p>A diferencia de la Kappa o el Alpha, el marco N define el "cero" no como una ausencia de datos, sino como el centro de masas del caos termodinámico del experimento[cite: 572, 431].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide10">
+    <div class="content-area">
+        <h2 class="slide-title">Hacia una Escala Universal de Significado</h2>
+        <div class="two-column">
+            <div style="text-align: center; border-right: 2px solid #ddd; display: flex; flex-direction: column; justify-content: center;">
+                <div class="highlight-number">85%</div>
+                <p style="font-weight: bold; color: var(--secondary); font-size: 24px; margin-top: 10px;">Percentil de Consenso</p>
+            </div>
+            <div>
+                <h3 style="color: var(--primary);">¿Qué significa realmente?</h3>
+                <p>No es una cifra lineal. Es una verdad estadística absoluta[cite: 447]:</p>
+                <p style="margin-top: 20px; font-weight: bold; font-style: italic; font-size: 22px; color: var(--secondary);">"Esta matriz posee un orden estructural superior al 85% de todas las combinaciones físicamente posibles en su diseño."</p>
+                <p style="margin-top: 20px;">Permite comparar directamente a un médico usando escalas binarias con un psicólogo usando escalas Likert continuas de 7 puntos[cite: 449].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide11">
+    <div class="content-area">
+        <h2 class="slide-title">Nivel III: Simulación Ponderada (WS)</h2>
+        <div class="tiled-content">
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-microscope"></i></div>
+                <h3>Auditoría de Estabilidad</h3>
+                <p>Reemplaza al Bootstrap clásico. No asume ingenuamente que la muestra empírica es un reflejo perfecto de la población[cite: 105, 106].</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-filter"></i></div>
+                <h3>Corrección de Densidad</h3>
+                <p>Normaliza los pesos teóricos (<math><mi>&#x3A9;</mi></math>) para evitar el sesgo de doble ponderación en muestras pequeñas, preservando el volumen del hiperespacio[cite: 494, 497].</p>
+            </div>
+            <div class="tile">
+                <div class="icon"><i class="fa-solid fa-shield-halved"></i></div>
+                <h3>Intervalos Estables</h3>
+                <p>Genera límites de confianza exactos que respetan la finitud y discreción del instrumento, libres de las falacias asintóticas del ANOVA (ICC)[cite: 171].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide12">
+    <div class="content-area">
+        <h2 class="slide-title">Topología Elástica: El Fin de la Imputación</h2>
+        <div class="two-column">
+            <div>
+                <h3>Datos Faltantes Dinámicos</h3>
+                <p>N recalcula la gravedad termodinámica de cada elemento <strong>on-the-fly</strong> empleando la Función Gamma de Euler (<math><mi>&#x393;</mi></math>)[cite: 39, 156].</p>
+                <ul class="bullet-list" style="margin-top: 15px;">
+                    <li><i class="fa-solid fa-check"></i> Sin imputaciones falsas[cite: 39].</li>
+                    <li><i class="fa-solid fa-check"></i> Sin amputaciones por lista (Listwise Deletion)[cite: 39].</li>
+                    <li><i class="fa-solid fa-check"></i> Manejo impecable de valores fraccionarios[cite: 38].</li>
+                </ul>
+            </div>
+            <div>
+                <h3>Detector de Agujeros Negros</h3>
+                <p>Actúa como un escáner diagnóstico de alta sensibilidad[cite: 509]:</p>
+                <p style="margin-top: 15px; background: var(--light-gray); padding: 15px; border-radius: 8px; border-left: 4px solid var(--danger);">Identifica sujetos o evaluadores específicos que inyectan entropía crítica en el sistema, aislando el ruido sin destruir la inferencia global[cite: 40].</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="slide-container" id="slide13">
+    <div class="content-area" style="text-align: center;">
+        <h1 style="font-size: 70px; margin-bottom: 10px;">?</h1>
+        <h2 style="text-align: center; border:none; margin-bottom: 30px; font-size: 40px; color: var(--primary);">¿Preguntas?</h2>
+        
+        <div style="background: var(--light-gray); padding: 30px 60px; border-radius: 20px; display: inline-block; margin-bottom: 30px; border: 2px solid #ddd;">
+            <p style="font-weight: bold; font-size: 22px; color: var(--text); margin-bottom: 10px;">Plataforma Oficial N-Metrics (Web App):</p>
+            <p style="font-family: 'Roboto Mono', monospace; font-size: 28px; color: var(--accent); font-weight: bold;">
+                https://n-metrics.streamlit.app
+            </p>
+        </div>
+        
+        <div style="font-size: 20px; color: var(--text);">
+            <p style="margin-bottom: 5px;"><strong>Manuel Narbona-Sarria</strong></p>
+            <p><a href="mailto:manuel.narsa@gmail.com" style="color: var(--secondary); text-decoration: none; font-weight: bold;">manuel.narsa@gmail.com</a></p>
+        </div>
+        
+        <p style="font-weight: bold; margin-top: 30px; color: var(--primary); font-size: 24px; font-family: 'Playfair Display', serif;">Gracias por su atención</p>
+    </div>
+</div>
+
+</body>
+</html>

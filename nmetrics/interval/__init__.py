@@ -1,13 +1,14 @@
 """
-Módulo Intervalar de nmetrics.
-Expone las funciones principales para calcular NI, AKI e ICC(2,1).
+Módulo Intervalar de n-metrics.
+Contiene los núcleos termodinámicos (Marco N) y estimadores clásicos
+para variables continuas/intervalares.
 """
 
-# 1. Importaciones del motor Natural Intervalar (NI)
+# 1. Importaciones del motor Termodinámico (Marco N)
 from .ni_core import (
-    calcular_estadisticas_ni,
     detectar_anomalias_ni,
     calcular_azar_termodinamico_ni,
+    calcular_estadisticas_ni_unificada,
     calcular_percentil_universal_ni
 )
 
@@ -23,11 +24,11 @@ from .icc21_core import (
     calcular_icc_poblacion_asintotica
 )
 
-# Definimos explícitamente qué se exporta si alguien usa "from nmetrics.interval import *"
+# Definimos explícitamente qué funciones son accesibles públicamente
 __all__ = [
-    "calcular_estadisticas_ni",
     "detectar_anomalias_ni",
     "calcular_azar_termodinamico_ni",
+    "calcular_estadisticas_ni_unificada",
     "calcular_percentil_universal_ni",
     "calcular_estadisticas_aki",
     "calcular_aki_poblacion_asintotica",
