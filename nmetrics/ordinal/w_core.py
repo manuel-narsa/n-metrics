@@ -3,13 +3,16 @@ import pandas as pd
 from math import comb
 
 # ==============================================================================
-# 1. Motor Vectorizado de Kendall W Clásico
+# REEMPLAZO EN w_core.py: KENDALL'S W INMUNE A VALORES ABSOLUTOS
 # ==============================================================================
 def _compute_w_vectorized(X_3d):
     """
     Cálculo vectorizado de Kendall's W (Coeficiente de Concordancia Ordinal)
+    optimizado con extracción topológica de empates.
     """
     S, n, m = X_3d.shape
+    
+    # Rango por pares (Esto ya era inmune a las etiquetas)
     diff = X_3d[:, :, None, :] - X_3d[:, None, :, :] 
     less = (diff < 0).astype(float)
     equal = (diff == 0).astype(float)
@@ -19,19 +22,22 @@ def _compute_w_vectorized(X_3d):
     mean_R = m * (n + 1) / 2.0
     S_val = np.sum((R_i - mean_R)**2, axis=1) 
     
-    k_escala = int(np.nanmax(X_3d))
-    counts = np.zeros((S, m, k_escala))
-    for k in range(1, k_escala + 1):
-        counts[:, :, k-1] = np.sum(X_3d == k, axis=1)
+    # NUEVO: Corrección de empates topológica (Sin crear k matrices en memoria)
+    unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
+    k_real = len(unique_vals)
+    counts = np.zeros((S, m, k_real))
+    
+    for idx, val in enumerate(unique_vals):
+        counts[:, :, idx] = np.sum(X_3d == val, axis=1)
         
     T_j = np.sum(counts**3 - counts, axis=2) 
     T_total = np.sum(T_j, axis=1) 
     
     denom = (m**2) * (n**3 - n) - m * T_total
-    #W = np.where(denom == 0, np.nan, (12 * S_val) / denom)
-    W = np.divide(12 * S_val, denom, 
-              out=np.full_like(denom, np.nan, dtype=float), 
-              where=(denom != 0))
+    
+    with np.errstate(divide='ignore', invalid='ignore'):
+        W = np.where(denom == 0, np.nan, 12.0 * S_val / denom)
+        
     return W
 
 # ==============================================================================

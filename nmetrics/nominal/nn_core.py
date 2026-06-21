@@ -9,31 +9,60 @@ from scipy.special import gammaln
 # ==============================================================================
 # 1. CONSTRUCCIÓN DEL HIPERESPACIO Y MACROESTADOS (NIVEL III)
 # ==============================================================================
+# ==============================================================================
+# REEMPLAZO EN nn_core.py: LA VÍA DE LAS PARTICIONES ENTERAS (O(P(m)))
+# ==============================================================================
 @lru_cache(maxsize=128)
 def _build_macrostate_dictionary_nn(m_jueces, k_escala):
-    fact = [math.factorial(i) for i in range(m_jueces + 1)]
+    fact = [math.factorial(i) for i in range(max(m_jueces, k_escala) + 1)]
     max_coincidencias = (m_jueces * (m_jueces - 1)) / 2
     macro_dict = defaultdict(float)
     
-    formas = itertools.combinations_with_replacement(range(1, k_escala + 1), m_jueces)
+    # 1. Generador ultra-rápido LIMITADO a k_escala (Evita explosión combinatoria)
+    def _get_bounded_partitions(n, max_len, max_val=None):
+        if max_val is None: max_val = n
+        if n == 0:
+            yield ()
+            return
+        if max_len == 0:
+            return
+        for i in range(min(n, max_val), 0, -1):
+            for p in _get_bounded_partitions(n - i, max_len - 1, i):
+                yield (i,) + p
+
+    particiones = list(_get_bounded_partitions(m_jueces, k_escala))
     
-    for forma in formas:
-        counts = {}
-        for x in forma:
-            counts[x] = counts.get(x, 0) + 1
+    # 2. Bucle Topológico: iteramos solo sobre las particiones válidas
+    for p in particiones:
+        v = len(p) 
         
-        # Cálculo rápido de coincidencias: sum(n*(n-1)/2)
-        coincidencias = sum((c * (c - 1)) >> 1 for c in counts.values())
+        # A) Cálculo de coincidencias (mismo nivel de acuerdo para toda la clase)
+        coincidencias = sum((c * (c - 1)) >> 1 for c in p)
         acuerdo = round(coincidencias / max_coincidencias, 8) if max_coincidencias > 0 else 0.0
         
-        denom = 1.0
-        for c in counts.values():
-            denom *= fact[c]
-            
-        multiplicidad = fact[m_jueces] / denom
-        macro_dict[acuerdo] += multiplicidad
+        # B) Multiplicidad base (permutaciones de los jueces dentro de los bloques)
+        denom_jueces = 1.0
+        for c in p:
+            denom_jueces *= fact[c]
+        multiplicidad_base = fact[m_jueces] / denom_jueces
         
-    return macro_dict
+        # C) Peso combinatorio de la escala
+        counts_of_sizes = {}
+        for c in p:
+            counts_of_sizes[c] = counts_of_sizes.get(c, 0) + 1
+            
+        peso_escala = 1.0
+        for i in range(v): 
+            peso_escala *= (k_escala - i)
+            
+        for size, freq in counts_of_sizes.items():
+            peso_escala /= fact[freq]
+            
+        # D) Multiplicidad total de la clase de equivalencia
+        multiplicidad_total = multiplicidad_base * peso_escala
+        macro_dict[acuerdo] += multiplicidad_total
+        
+    return dict(macro_dict)
 
 # ==============================================================================
 # 2. MOTOR TERMODINÁMICO DE SIMULACIÓN PONDERADA
@@ -150,11 +179,20 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     m_valid = np.sum(~np.isnan(X_estados), axis=1)
     max_coincidencias = m_valid * (m_valid - 1) / 2
 
+    # ---------------------------------------------------------
+    # CONTEO TOPOLÓGICO AGNÓSTICO (Inmune a etiquetas absolutas)
+    # ---------------------------------------------------------
     counts = np.zeros((U, k_escala))
-    X_clip = np.floor(X_estados + 0.5)
-    X_clip = np.clip(X_clip, 1, k_escala)
-    for k_val in range(1, k_escala + 1):
-        counts[:, k_val-1] = np.sum(X_clip == k_val, axis=1)
+    X_clean = np.floor(X_estados + 0.5)
+    
+    for i in range(U):
+        # Ignoramos los NaN de esta fila
+        row_valid = X_clean[i][~np.isnan(X_clean[i])]
+        if len(row_valid) > 0:
+            # np.unique cuenta la frecuencia de cada bloque, sin importar si la etiqueta es 1, 10 o 500
+            _, freqs = np.unique(row_valid, return_counts=True)
+            # Rellenamos el vector counts por la izquierda (el orden no importa para NN)
+            counts[i, :len(freqs)] = freqs
 
     coincidencias = np.sum(counts * (counts - 1) / 2, axis=1)
 

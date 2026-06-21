@@ -38,23 +38,26 @@ def calcular_parametros_poblacion_nominal(matriz_entrada, k_escala):
     return pd.DataFrame(filas_salida, columns=columnas), cols_x
 
 # ==============================================================================
-# 2. Motor Vectorizado de Fleiss Kappa Clásico (Plano / Sin Pesos)
+# REEMPLAZO EN kf_core.py: CONTEO AGNÓSTICO (INMUNE A ETIQUETAS ABSOLUTAS)
 # ==============================================================================
 def _compute_kf_vectorized_bc(X_3d, k_escala=5):
-    """Calcula Fleiss Kappa asumiendo equiprobabilidad estricta (1/n)."""
+    """Calcula Fleiss Kappa asumiendo equiprobabilidad estricta y conteo dinámico."""
     S, n, m = X_3d.shape
     
-    # Frecuencias por categoría: (S, n, k_escala)
-    counts = np.zeros((S, n, k_escala))
-    for k in range(1, k_escala + 1):
-        counts[:, :, k-1] = np.sum(X_3d == k, axis=2)
+    # Extraemos solo las categorías que realmente existen en el dataset
+    unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
+    
+    # Frecuencias por categoría existente
+    counts = np.zeros((S, n, len(unique_vals)))
+    for idx, val in enumerate(unique_vals):
+        counts[:, :, idx] = np.sum(X_3d == val, axis=2)
         
     # Acuerdo Observado (Po) por sujeto
     po_subj = np.sum(counts * (counts - 1), axis=2) / (m * (m - 1)) # (S, n)
     Po = np.mean(po_subj, axis=1) # (S,)
     
-    # Acuerdo Esperado (Pe)
-    total_counts = np.sum(counts, axis=1) # (S, k_escala)
+    # Acuerdo Esperado (Pe) basado solo en las marginales activas
+    total_counts = np.sum(counts, axis=1) # (S, len(unique_vals))
     Pe = np.sum((total_counts / (n * m)) ** 2, axis=1) # (S,)
     
     with np.errstate(divide='ignore', invalid='ignore'):

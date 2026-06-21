@@ -38,31 +38,32 @@ def calcular_parametros_poblacion_nominal(matriz_entrada, k_escala):
     return pd.DataFrame(filas_salida, columns=columnas), cols_x
 
 # ==============================================================================
-# 2. Motor Vectorizado de AKN Clásico (Plano / Sin Pesos)
+# REEMPLAZO EN akn_core.py: CONTEO AGNÓSTICO PARA ALFA DE AICKIN
 # ==============================================================================
 def _compute_akn_vectorized_bc(X_3d, k_escala=5):
-    """Calcula AKN asumiendo equiprobabilidad estricta (1/n)."""
+    """Calcula Alpha de Krippendorff Nominal (AKN) puro."""
     S, n, m = X_3d.shape
     
-    # Frecuencias por categoría: (S, n, k_escala)
-    counts = np.zeros((S, n, k_escala))
-    for k in range(1, k_escala + 1):
-        counts[:, :, k-1] = np.sum(X_3d == k, axis=2)
+    # Extraemos solo las categorías que realmente existen en el dataset
+    unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
+    
+    counts = np.zeros((S, n, len(unique_vals)))
+    for idx, val in enumerate(unique_vals):
+        counts[:, :, idx] = np.sum(X_3d == val, axis=2)
         
-    # StoreAgreement por sujeto: sum_c (n_ic * (n_ic - 1)) / (m * (m - 1))
-    store_agreement = np.sum(counts * (counts - 1), axis=2) / (m * (m - 1)) # (S, n)
+    # Acuerdo Observado (Po)
+    po_subj = np.sum(counts * (counts - 1), axis=2) / (m * (m - 1))
+    Po = np.mean(po_subj, axis=1) # (S,)
     
-    mean_store_agreement = np.mean(store_agreement, axis=1) # (S,)
-    pa = (1 - 1 / (n * m)) * mean_store_agreement + 1 / (n * m) # (S,)
-    
-    # Proporciones por categoría
-    p_c = np.sum(counts, axis=1) / (n * m) # (S, k_escala)
-    pe = np.sum(p_c ** 2, axis=1) # (S,)
+    # Acuerdo Esperado (Pe) - Fórmula exacta de Krippendorff Nominal
+    total_counts = np.sum(counts, axis=1) # (S, len(unique_vals))
+    N_total = n * m
+    Pe = np.sum(total_counts * (total_counts - 1), axis=1) / (N_total * (N_total - 1))
     
     with np.errstate(divide='ignore', invalid='ignore'):
-        akn_vals = np.where(pe == 1, np.nan, (pa - pe) / (1 - pe))
+        akn_vals = np.where(Pe == 1, np.nan, (Po - Pe) / (1 - Pe))
         
-    return akn_vals
+    return akn_vals # 🛠️ CORRECCIÓN: Sustituido el bucle EM por la fórmula AKN
 
 # ==============================================================================
 # 3. Cálculo Teórico Poblacional (Matriz Asintótica Masiva)

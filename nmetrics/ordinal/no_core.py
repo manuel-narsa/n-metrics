@@ -86,43 +86,75 @@ def calcular_suelo_cristal_no(m_jueces, k_escala):
     
     return float(np.sqrt(max(0.0, mu_a * (1.0 - sigma_a))))
 
+# ==============================================================================
+# REEMPLAZO EN no_core.py: OPTIMIZACIÓN TOPOLÓGICA (CLASES DE EQUIVALENCIA)
+# ==============================================================================
 def analizar_termodinamica_no(n_sujetos, m_jueces, k_escala, valor_observado=None):
     """
     Sustituye la campana de Gauss por el colapso exacto del hiperespacio en Macroestados.
-    Calcula la masa termodinámica compactada (donde sigma_A = 0 debido a la simetría 
-    de las permutaciones en n=1) para forjar los 11 peldaños inmutables.
+    [OPTIMIZADO MEDIANTE PARTICIONES ACOTADAS EN O(1) ESPACIAL]
     """
+    import math
+    import numpy as np
+    from collections import defaultdict
+    
     azar_esperado = float(np.sqrt(1.0 / k_escala))
     min_N = calcular_suelo_cristal_no(m_jueces, k_escala)
     
-    from collections import defaultdict
     prob_por_no = defaultdict(float)
     p_base = (1.0 / k_escala) ** m_jueces
     m_pairs = m_jueces * (m_jueces - 1) / 2.0
     
-    # Iterar las combinaciones puras para colapsar en Macroestados
-    for forma in itertools.combinations_with_replacement(range(1, k_escala + 1), m_jueces):
-        counts = Counter(forma)
-        denom = 1.0
-        for c in counts.values(): 
-            denom *= math.factorial(c)
-        multiplicidad = math.factorial(m_jueces) / denom
+    fact = [math.factorial(i) for i in range(max(m_jueces, k_escala) + 1)]
+    
+    # 1. Generador ultra-rápido LIMITADO a k_escala
+    def _get_bounded_partitions(n, max_len, max_val=None):
+        if max_val is None: max_val = n
+        if n == 0:
+            yield ()
+            return
+        if max_len == 0:
+            return
+        for i in range(min(n, max_val), 0, -1):
+            for p in _get_bounded_partitions(n - i, max_len - 1, i):
+                yield (i,) + p
+
+    particiones = list(_get_bounded_partitions(m_jueces, k_escala))
+    
+    # 2. Bucle Topológico: iteramos solo sobre las particiones válidas
+    for p in particiones:
+        v = len(p)
         
-        p_total = p_base * multiplicidad
+        # A) Coincidencias puras del macroestado (C_p)
+        c_p = sum((c * (c - 1)) / 2.0 for c in p)
         
-        # Coincidencias puras del macroestado (C_p)
-        c_p = 0
-        for count in counts.values():
-            if count > 1:
-                c_p += count * (count - 1) / 2.0
-                
-        # Al compactar todas las permutaciones en la escalera teórica, la varianza es cero
         mu_macro = c_p / m_pairs
         no_macro = np.sqrt(mu_macro) 
         
-        prob_por_no[no_macro] += p_total
+        # B) Multiplicidad base
+        denom_jueces = 1.0
+        for c in p:
+            denom_jueces *= fact[c]
+        multiplicidad_base = fact[m_jueces] / denom_jueces
         
-    # Función de Distribución Acumulada Discreta (CDF Física) de 11 peldaños
+        # C) Peso combinatorio de la escala
+        counts_of_sizes = {}
+        for c in p:
+            counts_of_sizes[c] = counts_of_sizes.get(c, 0) + 1
+            
+        peso_escala = 1.0
+        for i in range(v):
+            peso_escala *= (k_escala - i)
+            
+        for size, freq in counts_of_sizes.items():
+            peso_escala /= fact[freq]
+            
+        multiplicidad_total = multiplicidad_base * peso_escala
+        p_total = p_base * multiplicidad_total
+        
+        prob_por_no[no_macro] += p_total
+
+    # Función de Distribución Acumulada Discreta (CDF Física)
     no_ordenados = np.array(sorted(prob_por_no.keys()))
     probs = np.array([prob_por_no[v] for v in no_ordenados])
     probs = probs / np.sum(probs) 

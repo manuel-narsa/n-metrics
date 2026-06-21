@@ -26,42 +26,53 @@ def generar_matriz_termodinamica_exacta(n_sujetos, m_jueces, k_escala, target_N,
     agrupacion = {} 
     
     if "Intervalar" in topologia:
-        n_ext1, n_ext2 = m_jueces // 2, m_jueces - (m_jueces // 2)
+        n_ext1 = m_jueces // 2; n_ext2 = m_jueces - n_ext1
         mean_ext = (n_ext1 * 1 + n_ext2 * k_escala) / m_jueces
-        max_sigma = np.sqrt((n_ext1 * (1 - mean_ext)**2 + n_ext2 * (k_escala - mean_ext)**2) / m_jueces)
-    else: 
-        max_coinc = m_jueces * (m_jueces - 1) / 2
+        var_max = (n_ext1 * (1 - mean_ext)**2 + n_ext2 * (k_escala - mean_ext)**2) / m_jueces
+        sigma_max = math.sqrt(var_max)
+        
+        for f in formas:
+            s1 = sum(f)
+            s2 = sum(x*x for x in f)
+            mu_local = s1 / m_jueces
+            var_local = (s2 / m_jueces) - (mu_local * mu_local)
+            sigma_local = math.sqrt(max(0.0, var_local))
+            agrupacion[f] = max(0.0, 1.0 - (sigma_local / sigma_max))
 
-    for forma in formas:
-        arr = np.array(forma)
-        if "Intervalar" in topologia:
-            sigma = np.std(arr)
-            acuerdo = max(0.0, 1.0 - (sigma / max_sigma)) if max_sigma > 0 else 0.0
-            n_val = round(np.sqrt(acuerdo), 6)
-        else:
-            counts = [np.sum(arr == v) for v in opciones]
-            coinc = sum(c * (c - 1) / 2 for c in counts)
-            n_val = round(np.sqrt(coinc / max_coinc), 6) if max_coinc > 0 else 0.0
-        
-        multiplicidad = math.factorial(m_jueces) / np.prod([math.factorial(np.sum(arr == v)) for v in opciones])
-        if n_val not in agrupacion: agrupacion[n_val] = []
-        agrupacion[n_val].append((forma, multiplicidad))
-        
-    n_disponibles = sorted(list(agrupacion.keys()))
-    n_inf = max([n for n in n_disponibles if n <= target_N]) if any(n <= target_N for n in n_disponibles) else n_disponibles[0]
-    n_sup = min([n for n in n_disponibles if n >= target_N]) if any(n >= target_N for n in n_disponibles) else n_disponibles[-1]
-    p_sup = (target_N - n_inf) / (n_sup - n_inf) if n_sup != n_inf else 1.0
+    elif "Nominal" in topologia:
+        max_c = m_jueces * (m_jueces - 1) / 2
+        for f in formas:
+            counts = [f.count(x) for x in range(1, k_escala + 1)]
+            c = sum(v*(v-1)/2 for v in counts)
+            agrupacion[f] = c / max_c if max_c > 0 else 0.0
+            
+    else: # Ordinal
+        for f in formas:
+            counts = [f.count(x) for x in range(1, k_escala + 1)]
+            c = sum(v*(v-1)/2 for v in counts)
+            agrupacion[f] = c / (m_jueces * (m_jueces - 1) / 2) if m_jueces > 1 else 0.0
+
+    formas_list = list(agrupacion.keys())
+    acuerdos = np.array(list(agrupacion.values()))
     
-    def samplear(n_val, num):
-        if num <= 0: return []
-        opcs = agrupacion[n_val]
-        probs = np.array([o[1] for o in opcs]) / sum([o[1] for o in opcs])
-        return [list(np.random.permutation(opcs[idx][0])) for idx in np.random.choice(len(opcs), size=num, p=probs)]
+    n_obj = max(0.0, min(1.0, target_N))
+    target_A = n_obj**2
+    
+    distancias = np.abs(acuerdos - target_A)
+    sigma = 0.05 
+    pesos = np.exp(-0.5 * (distancias / sigma)**2)
+    suma = np.sum(pesos)
+    probs = pesos / suma if suma > 0 else np.ones(len(pesos)) / len(pesos)
 
-    filas = samplear(n_sup, int(round(p_sup * n_sujetos))) + samplear(n_inf, n_sujetos - int(round(p_sup * n_sujetos)))
-    np.random.shuffle(filas) 
-    return np.array(filas)
-
+    idx_elegidos = np.random.choice(len(formas_list), size=n_sujetos, p=probs, replace=True)
+    
+    matriz = []
+    for idx in idx_elegidos:
+        forma = np.array(formas_list[idx])
+        np.random.shuffle(forma)
+        matriz.append(forma)
+        
+    return np.array(matriz)
 
 def ejecutar_auditoria_cobertura(topologia, dim_n, dim_m, k_escala, target_N, n_experimentos, replicas, estimadores):
     """Simulación Monte Carlo optimizada termodinámicamente en O(1)"""
@@ -70,8 +81,12 @@ def ejecutar_auditoria_cobertura(topologia, dim_n, dim_m, k_escala, target_N, n_
     def _registrar_stat(nombre, mue, inf, sup, pob):
         if mue is None or inf is None or sup is None or pob is None: return
         if np.isnan(mue) or np.isnan(inf) or np.isnan(sup) or np.isnan(pob): return
-        stats[nombre]["hits_pob"] += 1 if inf <= pob <= sup else 0
-        stats[nombre]["hits_mue"] += 1 if inf <= mue <= sup else 0
+        
+        # 🚀 CORRECCIÓN DEFINITIVA: Blindaje de Coma Flotante a 6 decimales
+        # Se redondean los límites para evitar la Caída Topológica en nodos simétricos perfectos
+        stats[nombre]["hits_pob"] += 1 if round(inf, 6) <= round(pob, 6) <= round(sup, 6) else 0
+        stats[nombre]["hits_mue"] += 1 if round(inf, 6) <= round(mue, 6) <= round(sup, 6) else 0
+        
         stats[nombre]["anchos"].append(sup - inf)
         stats[nombre]["pobs"].append(pob)
         stats[nombre]["muestras"].append(mue)
@@ -150,7 +165,7 @@ def ejecutar_auditoria_cobertura(topologia, dim_n, dim_m, k_escala, target_N, n_
                 "Cob. Muestra (%)": (d["hits_mue"] / n_experimentos) * 100,
                 "µ(Población Real)": np.mean(d["pobs"]),
                 "µ(Valor Muestra)": np.mean(d["muestras"]),
-                "Ancho Medio IC": np.mean(d["anchos"])
+                "Media Ancho IC": np.mean(d["anchos"])
             })
     return final_res
 

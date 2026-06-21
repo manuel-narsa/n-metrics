@@ -8,12 +8,14 @@ from scipy.special import gammaln
 
 from functools import lru_cache
 
+# ==============================================================================
+# REEMPLAZO EN ni_core.py: LA VÍA DE LAS FORMAS ANCLADAS (INVARIANZA POR TRANSLACIÓN)
+# ==============================================================================
 @lru_cache(maxsize=128)
 def _build_macrostate_dictionary(m_jueces, k_escala):
-    # 1. Pre-calculamos factoriales para la multiplicidad
     fact = [math.factorial(i) for i in range(m_jueces + 1)]
     
-    # 2. Definimos límites físicos para normalizar sigma
+    # 1. Definimos límites físicos para normalizar sigma
     n_ext1 = m_jueces // 2
     n_ext2 = m_jueces - n_ext1
     mean_ext = (n_ext1 * 1 + n_ext2 * k_escala) / m_jueces
@@ -21,11 +23,21 @@ def _build_macrostate_dictionary(m_jueces, k_escala):
     max_sigma = math.sqrt(var_ext)
     
     macro_dict = defaultdict(float)
-    formas = itertools.combinations_with_replacement(range(1, k_escala + 1), m_jueces)
     
-    # 3. Bucle ultra-rápido (Python puro)
-    for forma in formas:
-        # Cálculo manual de sigma (evita crear np.array)
+    # 2. Generamos solo Formas Ancladas: el primer voto siempre es 0.
+    # Los (m-1) votos restantes se distribuyen en una distancia máxima de k_escala-1
+    formas_resto = itertools.combinations_with_replacement(range(k_escala), m_jueces - 1)
+    
+    # 3. Bucle Optimizado
+    for resto in formas_resto:
+        # Reconstruimos la forma completa
+        forma = (0,) + resto
+        
+        # Calculamos la anchura del patrón para saber cuánto puede deslizarse por el tablero k
+        max_val = forma[-1] 
+        desplazamientos = k_escala - max_val 
+        
+        # A) Cálculo de sigma (Varianza inalterable al desplazamiento)
         s1 = sum(forma)
         s2 = sum(x*x for x in forma)
         variance = (s2 / m_jueces) - (s1 / m_jueces)**2
@@ -34,8 +46,7 @@ def _build_macrostate_dictionary(m_jueces, k_escala):
         acuerdo = max(0.0, 1.0 - (sigma / max_sigma))
         acuerdo_key = round(acuerdo, 8)
         
-        # Multiplicidad mediante conteo de frecuencias
-        # Usamos un diccionario de frecuencias rápido
+        # B) Multiplicidad de la forma anclada
         counts = {}
         for x in forma:
             counts[x] = counts.get(x, 0) + 1
@@ -44,10 +55,12 @@ def _build_macrostate_dictionary(m_jueces, k_escala):
         for c in counts.values():
             denom *= fact[c]
             
-        multiplicidad = fact[m_jueces] / denom
-        macro_dict[acuerdo_key] += multiplicidad
+        multiplicidad_base = fact[m_jueces] / denom
         
-    return macro_dict
+        # C) Asignación masiva al volumen total multiplicando por los desplazamientos posibles
+        macro_dict[acuerdo_key] += (multiplicidad_base * desplazamientos)
+        
+    return dict(macro_dict)
 
 def detectar_anomalias_ni(matriz_entrada, k_escala=5, umbral_sigma=1.0):
     X = np.array(matriz_entrada, dtype=float)

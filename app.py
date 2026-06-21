@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,6 +6,7 @@ import time
 import math
 import os
 import sys
+import plotly.express as px
 from PIL import Image
 
 # ==============================================================================
@@ -60,11 +62,14 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
     elif "Ordinal" in topologia and "NO (Marco N)" in estimadores:
         try:
             no_muestra, pob_real, inf, sup = no_core.calcular_estadisticas_no_unificada(dict_estados, k_calc, replicas)
-            azar_no, _, perc_no, _ = no_core.analizar_termodinamica_no(n_total, m_jueces, k_calc, valor_observado=pob_real)
+            
+            # 🚀 CORRECCIÓN DEFINITIVA: Desempaquetado usando tu función unificada real
+            p_e, _, perc, min_N = no_core.analizar_termodinamica_no(n_total, m_jueces, k_calc, valor_observado=pob_real)
+            
             resultados_inf.append({
                 "Métrica": "NO", "Muestra": no_muestra, "Pob. Real": pob_real, 
                 "IC Inf": inf, "IC Sup": sup, "Ancho IC": sup - inf,
-                "Valor Azar": azar_no, "Percentil (%)": perc_no, "Motor": "Límite Asintótico Central"
+                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Límite Asintótico Central"
             })
         except Exception as e: st.warning(f"⚠️ El motor NO falló: {e}")
 
@@ -75,13 +80,21 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                 try:
                     p_aki = aki_core.calcular_aki_poblacion_asintotica(matriz_np, 1, k_calc, 100)
                     st_aki = aki_core.calcular_estadisticas_aki(matriz_np, replicas)
-                    resultados_inf.append({"Métrica": "AKI", "Muestra": st_aki['AKI Muestra'], "Pob. Real": p_aki, "IC Inf": st_aki['IC Inf'], "IC Sup": st_aki['IC Sup'], "Motor": "Bootstrap Clásico"})
+                    resultados_inf.append({
+                        "Métrica": "AKI", "Muestra": st_aki['AKI Muestra'], "Pob. Real": p_aki, 
+                        "IC Inf": st_aki['IC Inf'], "IC Sup": st_aki['IC Sup'], 
+                        "Ancho IC": st_aki['IC Sup'] - st_aki['IC Inf'], "Motor": "Bootstrap Clásico"
+                    })
                 except: pass
             if "ICC(2,1) (F-ANOVA)" in estimadores:
                 try:
                     p_icc = icc21_core.calcular_icc_poblacion_asintotica(matriz_np, 1, k_calc, 100)
                     st_icc = icc21_core.calcular_estadisticas_icc21(matriz_np)
-                    resultados_inf.append({"Métrica": "ICC(2,1)", "Muestra": st_icc['ICC Muestra'], "Pob. Real": p_icc, "IC Inf": st_icc['IC Inf'], "IC Sup": st_icc['IC Sup'], "Motor": "F-ANOVA"})
+                    resultados_inf.append({
+                        "Métrica": "ICC(2,1)", "Muestra": st_icc['ICC Muestra'], "Pob. Real": p_icc, 
+                        "IC Inf": st_icc['IC Inf'], "IC Sup": st_icc['IC Sup'], 
+                        "Ancho IC": st_icc['IC Sup'] - st_icc['IC Inf'], "Motor": "F-ANOVA"
+                    })
                 except: pass    
 
         if "Nominal" in topologia:
@@ -89,13 +102,21 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                 try:
                     p_akn = akn_core.calcular_akn_poblacion_asintotica(matriz_np, k_calc, 100)
                     st_akn = akn_core.calcular_estadisticas_akn(matriz_np, replicas)
-                    resultados_inf.append({"Métrica": "AKN", "Muestra": st_akn['AKN Muestra'], "Pob. Real": p_akn, "IC Inf": st_akn['IC Inf'], "IC Sup": st_akn['IC Sup'], "Motor": "Bootstrap Clásico"})
+                    resultados_inf.append({
+                        "Métrica": "AKN", "Muestra": st_akn['AKN Muestra'], "Pob. Real": p_akn, 
+                        "IC Inf": st_akn['IC Inf'], "IC Sup": st_akn['IC Sup'], 
+                        "Ancho IC": st_akn['IC Sup'] - st_akn['IC Inf'], "Motor": "Bootstrap Clásico"
+                    })
                 except: pass
             if "Kappa Fleiss (Bootstrap C.)" in estimadores:
                 try:
                     p_kf = kf_core.calcular_kf_poblacion_asintotica(matriz_np, k_calc, 100)
                     st_kf = kf_core.calcular_estadisticas_kf(matriz_np, replicas)
-                    resultados_inf.append({"Métrica": "KF", "Muestra": st_kf['KF Muestra'], "Pob. Real": p_kf, "IC Inf": st_kf['IC Inf'], "IC Sup": st_kf['IC Sup'], "Motor": "Bootstrap Clásico"})
+                    resultados_inf.append({
+                        "Métrica": "KF", "Muestra": st_kf['KF Muestra'], "Pob. Real": p_kf, 
+                        "IC Inf": st_kf['IC Inf'], "IC Sup": st_kf['IC Sup'], 
+                        "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Bootstrap Clásico"
+                    })
                 except: pass
 
         if "Ordinal" in topologia:
@@ -103,13 +124,21 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                 try:
                     p_ako = ako_core.calcular_ako_poblacion_asintotica(matriz_np, k_calc, 100)
                     st_ako = ako_core.calcular_estadisticas_ako(matriz_np, replicas)
-                    resultados_inf.append({"Métrica": "AKO", "Muestra": st_ako['AKO Muestra'], "Pob. Real": p_ako, "IC Inf": st_ako['IC Inf'], "IC Sup": st_ako['IC Sup'], "Motor": "Bootstrap Clásico"})
+                    resultados_inf.append({
+                        "Métrica": "AKO", "Muestra": st_ako['AKO Muestra'], "Pob. Real": p_ako, 
+                        "IC Inf": st_ako['IC Inf'], "IC Sup": st_ako['IC Sup'], 
+                        "Ancho IC": st_ako['IC Sup'] - st_ako['IC Inf'], "Motor": "Bootstrap Clásico"
+                    })
                 except: pass
             if "Kendall W (Bootstrap C.)" in estimadores:
                 try:
                     p_w = w_core.calcular_w_poblacion_asintotica(matriz_np, k_calc, 100)
                     st_w = w_core.calcular_estadisticas_w(matriz_np, replicas)
-                    resultados_inf.append({"Métrica": "W", "Muestra": st_w['W Muestra'], "Pob. Real": p_w, "IC Inf": st_w['IC Inf'], "IC Sup": st_w['IC Sup'], "Motor": "Bootstrap Clásico"})
+                    resultados_inf.append({
+                        "Métrica": "W", "Muestra": st_w['W Muestra'], "Pob. Real": p_w, 
+                        "IC Inf": st_w['IC Inf'], "IC Sup": st_w['IC Sup'], 
+                        "Ancho IC": st_w['IC Sup'] - st_w['IC Inf'], "Motor": "Bootstrap Clásico"
+                    })
                 except: pass
 
     return resultados_inf
@@ -144,7 +173,7 @@ topologia = st.session_state["topologia_activa"].split(" ")[0]
 # ==============================================================================
 st.sidebar.header("📂 Carga de Datos")
 separador = st.sidebar.selectbox("Separador del CSV", [",", ";", "\t"], key="sep_main", on_change=reset_session_state)
-archivo_subido = st.sidebar.file_uploader("Sube tu matriz empírica (CSV)", type=["csv", "txt"], on_change=reset_session_state)
+archivo_subido = st.sidebar.file_uploader("Sube tu matriz empírica (CSV, TXT)", type=["csv", "txt"], on_change=reset_session_state)
 
 if archivo_subido is not None and 'diccionario_estados' not in st.session_state:
     with st.sidebar.status("⚙️ Procesando matriz...", expanded=True) as status:
@@ -152,7 +181,7 @@ if archivo_subido is not None and 'diccionario_estados' not in st.session_state:
             dict_est, n_total = cargar_y_agregar_dataset(archivo_subido, separador)
             st.session_state.diccionario_estados = dict_est
             st.session_state.n_total = n_total
-            st.session_state["topologia_activa"] = "Intervalar (Continua)"
+            st.session_state["topologia_activa"] = "Intervalar (Discreta/Continua)"
             st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
             
             archivo_subido.seek(0)
@@ -168,9 +197,9 @@ if archivo_subido is not None and 'diccionario_estados' not in st.session_state:
 if 'df_original_raw' in st.session_state and st.session_state['df_original_raw'] is not None and len(st.session_state['df_original_raw']) > 0:
     st.sidebar.success(f"✅ Matriz activa: {st.session_state.get('n_total', 0):,} sujetos.")
     if st.session_state.get('usar_sintetica'):
-        if st.sidebar.button("🗑️ Borrar Matriz Sintética", use_container_width=True):
+        if st.sidebar.button("🗑️ Borrar Matriz Sintética", width="stretch"):
             reset_session_state()
-            st.session_state["topologia_activa"] = "Intervalar (Continua)"
+            st.session_state["topologia_activa"] = "Intervalar (Discreta/Continua)"
             st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
             st.rerun()
 
@@ -179,7 +208,7 @@ v_min_user = st.sidebar.number_input("Valor MÍNIMO", value=1.0)
 v_max_user = st.sidebar.number_input("Valor MÁXIMO", value=5.0)
 replicas = st.sidebar.slider("Réplicas de Simulación (S)", 100, 5000, 1000)
 
-topologia_opciones = ["Intervalar (Continua)", "Nominal (Categórica)", "Ordinal (Ordenada)"]
+topologia_opciones = ["Intervalar (Discreta/Continua)", "Nominal (Categórica)", "Ordinal (Ordenada)"]
 indice_actual = topologia_opciones.index(st.session_state["topologia_activa"]) if st.session_state["topologia_activa"] in topologia_opciones else 0
 seleccion_user = st.sidebar.radio("Naturaleza de los datos:", topologia_opciones, index=indice_actual)
 
@@ -192,31 +221,62 @@ if seleccion_user != st.session_state["topologia_activa"]:
 # PROCESAMIENTO TOPOLÓGICO Y VARIABLES GLOBALES
 # ==============================================================================
 matriz_original, matriz_empirica = None, None  
-k_escala = st.session_state.get('k_escala', 5)            
+k_escala = None
 n_sujetos, m_jueces = 0, 0
+escala_valida = True  
 
+# 1. EL USUARIO MANDA: Conecta aquí tus VARIABLES REALES
+# Sustituye 'tu_variable_minima' por el nombre real de tu st.sidebar.number_input
+limite_inferior = float(v_min_user) 
+limite_superior = float(v_max_user)
+
+# 2. CARGAMOS LA MATRIZ (Sea Sintética o Empírica)
 if st.session_state.get('usar_sintetica') and st.session_state.get('matriz_generada_app') is not None:
     df_gen = st.session_state['matriz_generada_app']
     n_sujetos, m_jueces = df_gen.shape
     matriz_original = df_gen.values
-    matriz_empirica = df_gen.values 
-elif 'df_original_raw' in st.session_state and not st.session_state.get('usar_sintetica'):
-    try:
-        matriz_original = st.session_state['df_original_raw'].values
-        n_sujetos, m_jueces = matriz_original.shape
-        magnitude = 10 ** math.floor(math.log10(abs(v_min_user))) if v_min_user != 0 else 1.0
-        shift = (v_min_user / magnitude) - 1
-        matriz_empirica = (matriz_original / magnitude) - shift
-        
-        st.session_state['matriz_empirica'] = matriz_empirica
-        k_escala = int(round((v_max_user / magnitude) - shift))
-        st.session_state['k_escala'] = k_escala
-        
-        if np.nanmax(matriz_empirica) > k_escala + 0.01 or np.nanmin(matriz_empirica) < 0.99:
-            st.sidebar.error(f"🚨 Escala Inconsistente: La matriz contiene respuestas fuera del rango.")
-            st.stop()
-    except Exception as e: st.sidebar.error(f"Error en el procesamiento: {e}")
 
+elif 'df_original_raw' in st.session_state and not st.session_state.get('usar_sintetica'):
+    matriz_original = st.session_state['df_original_raw'].values
+    n_sujetos, m_jueces = matriz_original.shape
+
+# 3. AUDITORÍA ESTRICTA Y MAPEO LINEAL (Universal)
+if matriz_original is not None:
+    try:
+        if not np.isnan(matriz_original).all():
+            val_max = float(np.nanmax(matriz_original))
+            val_min = float(np.nanmin(matriz_original))
+            
+            # Auditoría de desbordamiento (con tolerancia micrométrica)
+            if val_max > (limite_superior + 0.00001) or val_min < (limite_inferior - 0.00001):
+                st.sidebar.error(f"🚨 **Escala Inconsistente:** La matriz contiene valores (de {val_min} a {val_max}) que DESBORDAN los límites teóricos declarados [{limite_inferior}, {limite_superior}].")
+                escala_valida = False
+
+        if escala_valida:
+            rango_escala = limite_superior - limite_inferior
+            if rango_escala <= 0:
+                st.sidebar.error("🚨 El límite superior debe ser estrictamente mayor que el límite inferior.")
+                escala_valida = False
+            else:
+                # El mapeo lineal indestructible
+                k_escala = int(round(rango_escala + 1)) 
+                matriz_empirica = 1 + (matriz_original - limite_inferior) * ((k_escala - 1) / rango_escala)
+                matriz_empirica = np.clip(matriz_empirica, 1.0, float(k_escala))
+                
+                # Guardamos en sesión
+                st.session_state['matriz_empirica'] = matriz_empirica
+                st.session_state['k_escala'] = k_escala
+                
+    except Exception as e: 
+        st.sidebar.error(f"Error en el procesamiento matemático: {e}")
+        escala_valida = False
+
+# 4. PURGA DE MEMORIA Y BLOQUEO SEGURO
+if not escala_valida:
+    st.session_state.pop('matriz_empirica', None)
+    st.session_state.pop('res_inferencia', None)
+    st.warning("⚠️ **El cálculo está bloqueado.** Has introducido unos límites de escala incompatibles con la matriz actual. Por favor, corrige los valores en el menú lateral.")
+    st.stop()
 # ==============================================================================
 # CABECERA Y NAVEGACIÓN
 # ==============================================================================
@@ -228,7 +288,7 @@ with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica y auditoría topológica de matrices empíricas.")
 
-opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "🔄 Invarianza Topológica", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autoría y Licencia"]
+opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza Topológica", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autoría y Licencia"]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
 if pestaña_seleccionada != st.session_state["pestaña_activa"]:
@@ -244,7 +304,7 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
         st.success(f"🚀 Análisis Activo: Procesando {n_sujetos:,} registros.")
         with st.expander("👁️ Ver Matriz", expanded=False):
             df_vis = pd.DataFrame(matriz_original, columns=[f"J{j+1:03d}" for j in range(m_jueces)], index=[f"S{i+1:03d}" for i in range(n_sujetos)])
-            st.dataframe(df_vis, use_container_width=True)
+            st.dataframe(df_vis, width="stretch")
 
     if "Intervalar" in topologia: opciones = ["NI (Marco N)", "AKI (Bootstrap C.)", "ICC(2,1) (F-ANOVA)"]
     elif "Nominal" in topologia: opciones = ["NN (Marco N)", "AKN (Bootstrap C.)", "Kappa Fleiss (Bootstrap C.)"]
@@ -293,11 +353,11 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
                 except: pass
                 return estilos
 
-            st.dataframe(df_res[columnas_a_mostrar].style.format(formatos).apply(auditar, axis=1), use_container_width=True)
+            st.dataframe(df_res[columnas_a_mostrar].style.format(formatos).apply(auditar, axis=1), width="stretch")
             
         st.markdown("---")
         st.markdown(f"### 🔍 Escáner de Anomalías ({'Jueces Disidentes' if 'Ordinal' in topologia else 'Macroestados'})")
-        umbral_sigma = st.slider("Umbral de tolerancia ($\sigma$):", 0.5, 3.0, 1.5, 0.1)
+        umbral_sigma = st.slider("Umbral de tolerancia ($\\sigma$):", 0.5, 3.0, 1.5, 0.1)
 
         if st.button("🔎 Ejecutar Escáner", type="secondary"):
             with st.spinner("Buscando perturbaciones termodinámicas..."):
@@ -343,15 +403,19 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
                     if not df_anomalos.empty:
                         st.warning(f"🚨 Detectados {len(df_anomalos)} {datos_a['tipo'].lower()} anómalos:")
                         df_visual = df_anomalos[['Acuerdo_Local']].rename(columns={'Acuerdo_Local': 'Acuerdo Local (A)'})
-                        st.dataframe(df_visual.style.format("{:.4f}").apply(lambda x: ['background-color: #fee2e2; color: #dc3545; font-weight: bold;']*len(x), axis=1), use_container_width=True)
-                    else: st.success(f"✨ Sistema estable bajo $\sigma = {umbral_sigma}$.")
+                        st.dataframe(df_visual.style.format("{:.4f}").apply(lambda x: ['background-color: #fee2e2; color: #dc3545; font-weight: bold;']*len(x), axis=1), width="stretch")
+                    else: st.success(f"✨ Sistema estable bajo $\\sigma = {umbral_sigma}$.")
 
 # ==============================================================================
-# PESTAÑA 2: PRUEBAS DE COBERTURA
+# PESTAÑA 2: PRUEBAS DE COBERTURA (INTERACTIVA)
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '🎯 Pruebas de Cobertura':
     st.markdown("### Auditoría de Cobertura Termodinámica")
-    if k_escala is None: st.warning("⚠️ Debes definir el límite (k) en el panel lateral.")
+    # Comprobamos primero si hay matriz, que es lo más importante
+    if matriz_original is None:
+        st.warning("⚠️ **Aviso:** Debes cargar un archivo de datos (.csv o .txt) desde el panel lateral izquierdo antes de usar esta sección.")
+    elif k_escala is None:
+        st.warning("⚠️ **Aviso:** Debes verificar los límites de la escala (k) en el panel lateral.")
     else:
         dim_n, dim_m = n_sujetos if matriz_empirica is not None else 50, m_jueces if matriz_empirica is not None else 7
         if matriz_empirica is not None and dim_n > 1500:
@@ -364,7 +428,8 @@ elif st.session_state["pestaña_activa"] == '🎯 Pruebas de Cobertura':
         
         with st.spinner("Calculando límites del hiperespacio..."):
             if "Intervalar" in topologia: 
-                azar_N, min_N = ni_core.calcular_azar_termodinamico_ni(dim_m, k_escala), 0.0 
+                azar_N = ni_core.calcular_azar_termodinamico_ni(dim_m, k_escala)
+                min_N = 0.0 
                 opciones_cob = ["NI (Marco N)", "Alpha Krippendorff", "ICC(2,1)"]
             elif "Nominal" in topologia:
                 azar_N = nn_core.calcular_azar_termodinamico_nn(dim_m, k_escala)
@@ -374,31 +439,258 @@ elif st.session_state["pestaña_activa"] == '🎯 Pruebas de Cobertura':
                 azar_N, _, _, min_N = no_core.analizar_termodinamica_no(dim_n, dim_m, k_escala)
                 opciones_cob = ["NO (Marco N)", "Alpha Krippendorff", "Kendall W"]
 
-        target_N = st.slider("Selecciona el Nivel de Consenso (N) objetivo:", float(min_N), 1.0, float(azar_N), 0.01, format="%.4f")
+        val_default = float(np.clip(azar_N, min_N, 1.0))
+        target_N = st.slider("Selecciona el Nivel de Consenso (N) objetivo:", float(min_N), 1.0, val_default, 0.01, format="%.4f")
         
-        if "Intervalar" in topologia: perc = ni_core.calcular_percentil_universal_ni(target_N, dim_m, k_escala)
-        elif "Nominal" in topologia: perc = nn_core.calcular_percentil_universal_nn(target_N, dim_m, k_escala)
-        else: _, _, perc, _ = no_core.analizar_termodinamica_no(dim_n, dim_m, k_escala, valor_observado=target_N)
+        if "Intervalar" in topologia: 
+            perc = ni_core.calcular_percentil_universal_ni(target_N, dim_m, k_escala)
+        elif "Nominal" in topologia: 
+            perc = nn_core.calcular_percentil_universal_nn(target_N, dim_m, k_escala)
+        else: 
+            _, _, perc, _ = no_core.analizar_termodinamica_no(dim_n, dim_m, k_escala, valor_observado=target_N)
+
+        # --- CAJA DE TRADUCCIÓN TERMODINÁMICA ---
+        st.info(f"💡 **El Puntero Termodinámico:** Para este diseño ($k={k_escala}, m={dim_m}$), un consenso objetivo de **$N = {target_N:.2f}$** actúa como un puntero en el **Percentil {perc:.1f}%** de la masa entrópica. Significa que el simulador generará matrices que tienen más orden estructural que el {perc:.1f}% de todos los universos aleatorios posibles.")
 
         c1, c2, c3 = st.columns(3)
-        c1.metric("Mínimo Físico", f"{min_N:.4f}"); c2.metric("Azar Esperado", f"{azar_N:.4f}"); c3.metric("🏆 Percentil", f"{perc:.2f} %")
+        c1.metric("Mínimo Físico", f"{min_N:.4f}")
+        c2.metric("Azar Esperado", f"{azar_N:.4f}")
+        c3.metric("🏆 Percentil", f"{perc:.2f} %")
         
-        # --- NUEVO: Selector de modelos a auditar ---
         estimadores_cob = st.multiselect("Estimadores a enfrentar en la auditoría:", opciones_cob, default=opciones_cob)
         
         n_experimentos = st.number_input("Matrices a simular", 10, 500, 50, 10)
         carga = dim_n * dim_m * n_experimentos
-        if carga > 1000000: st.error(f"🚨 **Límite excedido:** {carga:,} celdas. Reduce los experimentos.")
+        if carga > 1000000: 
+            st.error(f"🚨 **Límite excedido:** {carga:,} celdas. Reduce los experimentos.")
         
         if st.button("🔬 Iniciar Prueba", type="primary", disabled=(carga > 1000000) or not estimadores_cob):
-            with st.spinner("Simulando..."):
-                # Ahora pasamos la variable 'estimadores_cob' como octavo argumento
+            with st.spinner("Simulando universos correlacionados..."):
                 res_cob = ejecutar_auditoria_cobertura(topologia, dim_n, dim_m, k_escala, target_N, n_experimentos, replicas, estimadores_cob)
                 if res_cob:
                     df_cob = pd.DataFrame(res_cob)
-                    st.dataframe(df_cob.style.format({"Cob. Población (%)": "{:.1f}", "Cob. Muestra (%)": "{:.1f}", "µ(Población Real)": "{:.4f}", "µ(Valor Muestra)": "{:.4f}", "Ancho Medio IC": "{:.4f}"}), use_container_width=True)
+                    formato_columnas = {
+                        "Cobertura Población (%)": "{:.1f}", "Cobertura Muestra (%)": "{:.1f}", 
+                        "µ(Población Real)": "{:.4f}", "µ(Valor Muestra)": "{:.4f}", "Media Ancho IC": "{:.4f}"
+                    }
+                    formato_valido = {k: v for k, v in formato_columnas.items() if k in df_cob.columns}
+                    st.dataframe(df_cob.style.format(formato_valido), width="stretch")
+
 # ==============================================================================
-# PESTAÑA 3: INVARIANZA TOPOLÓGICA
+# PESTAÑA 3: INFORME MULTIRRANGO (PROCESAMIENTO MASIVO BATCH WEB)
+# ==============================================================================
+elif st.session_state["pestaña_activa"] == '📈 Informe Multirrango':
+    st.markdown("### 📈 Auditoría de Cobertura Avanzada (Informe Multirrango)")
+    st.error("🛑 **AVISO CRÍTICO DE RENDIMIENTO EN LA NUBE:** Este análisis ejecuta simulaciones masivas anidadas. Los servidores web tienen memoria limitada. Si el rango de celdas es inmenso (ej. > 100 celdas con S=500), la plataforma web podría cortar la conexión. Se recomienda prudencia en los rangos.")
+    
+    st.markdown("#### 📐 Configuración de Rangos y Pasos")
+    
+    row1_1, row1_2, row1_3 = st.columns(3)
+    with row1_1: k_min = st.number_input("Escala Mínima (k)", 2, 20, 3)
+    with row1_2: k_max = st.number_input("Escala Máxima (k)", 2, 20, 5)
+    with row1_3: k_step = st.number_input("Paso de Escala (Δk)", 1, 10, 1)
+        
+    row2_1, row2_2, row2_3 = st.columns(3)
+    with row2_1: m_min = st.number_input("Jueces Mínimos (m)", 2, 50, 4)
+    with row2_2: m_max = st.number_input("Jueces Máximos (m)", 2, 50, 8)
+    with row2_3: m_step = st.number_input("Paso de Jueces (Δm)", 1, 10, 2)
+
+    row3_1, row3_2, row3_3 = st.columns(3)
+    with row3_1: n_min = st.number_input("Sujetos Mínimos (n)", 5, 2000, 10)
+    with row3_2: n_max = st.number_input("Sujetos Máximos (n)", 5, 2000, 30)
+    with row3_3: n_step = st.number_input("Paso de Sujetos (Δn)", 5, 500, 10)
+
+    st.markdown("#### 🎲 Configuración de Cobertura y Simulación")
+    
+    st.info("💡 **El Puntero Termodinámico:** Al fijar un Consenso Objetivo (N), estás indicando al simulador el *Percentil* de masa entrópica que quieres alcanzar. Esto garantiza que la presión topológica sea exactamente la misma en todas las combinaciones.")
+    
+    row4_1, row4_2, row4_3 = st.columns(3)
+    with row4_1: target_min = st.number_input("Consenso Mínimo Objetivo (N)", 0.0, 1.0, 0.4, 0.05)
+    with row4_2: target_max = st.number_input("Consenso Máximo Objetivo (N)", 0.0, 1.0, 0.8, 0.05)
+    with row4_3: target_step = st.number_input("Paso de Consenso (ΔN)", 0.01, 0.5, 0.2, 0.05)
+
+    row5_1, row5_2 = st.columns(2)
+    with row5_1: n_experimentos = st.number_input("Experimentos (Matrices por celda)", 5, 1000, 20, 5)
+    with row5_2: replicas_batch = st.number_input("Réplicas del Bootstrap (S)", 50, 5000, 200, 50)
+
+    if "Intervalar" in topologia: opciones_cob = ["NI (Marco N)", "Alpha Krippendorff", "ICC(2,1)"]
+    elif "Nominal" in topologia: opciones_cob = ["NN (Marco N)", "Alpha Krippendorff", "Kappa Fleiss"]
+    else: opciones_cob = ["NO (Marco N)", "Alpha Krippendorff", "Kendall W"]
+    estimadores_cob = st.multiselect("Modelos a evaluar en paralelo:", opciones_cob, default=opciones_cob)
+
+    if st.button("🔬 Iniciar Procesamiento Masivo", type="primary", disabled=not estimadores_cob):
+        k_arr = range(int(k_min), int(k_max) + 1, int(k_step))
+        m_arr = range(int(m_min), int(m_max) + 1, int(m_step))
+        n_arr = range(int(n_min), int(n_max) + 1, int(n_step))
+        t_arr = np.arange(float(target_min), float(target_max) + 0.0001, float(target_step))
+
+        total_combinaciones = len(k_arr) * len(m_arr) * len(n_arr) * len(t_arr)
+        st.info(f"Calculando {total_combinaciones:,} celdas de diseño espacial...")
+
+        progreso = st.progress(0)
+        status_text = st.empty()
+        contador = 0
+        
+        # --- ALMACENAMIENTO EN MEMORIA (Seguro para la Web) ---
+        lista_resultados_memoria = []
+
+        for curr_k in k_arr:
+            for curr_m in m_arr:
+                for curr_n in n_arr:
+                    for curr_t in t_arr:
+                        contador += 1
+                        status_text.text(f"Procesando celda {contador}/{total_combinaciones} ➔ (k={curr_k}, m={curr_m}, n={curr_n}, N_obj={curr_t:.4f})")
+                        
+                        res_celda = ejecutar_auditoria_cobertura(
+                            topologia, int(curr_n), int(curr_m), int(curr_k), 
+                            float(curr_t), int(n_experimentos), int(replicas_batch), estimadores_cob
+                        )
+                        
+                        if res_celda:
+                            df_celda = pd.DataFrame(res_celda)
+                            
+                            if "Intervalar" in topologia: p_val = ni_core.calcular_percentil_universal_ni(float(curr_t), int(curr_m), int(curr_k))
+                            elif "Nominal" in topologia: p_val = nn_core.calcular_percentil_universal_nn(float(curr_t), int(curr_m), int(curr_k))
+                            else: _, _, p_val, _ = no_core.analizar_termodinamica_no(int(curr_n), int(curr_m), int(curr_k), valor_observado=float(curr_t))
+                            
+                            df_celda.insert(0, "Percentil (%)", round(p_val, 2))
+                            df_celda.insert(0, "Réplicas (S)", int(replicas_batch))
+                            df_celda.insert(0, "Experimentos", int(n_experimentos))
+                            df_celda.insert(0, "Nivel Cobertura Objetivo (N)", float(curr_t))
+                            df_celda.insert(0, "Dimension n", int(curr_n))
+                            df_celda.insert(0, "Dimension m", int(curr_m))
+                            df_celda.insert(0, "Escala k", int(curr_k))
+                            
+                            # Acumulamos en RAM en vez de disco
+                            lista_resultados_memoria.append(df_celda)
+
+                        progreso.progress(contador / total_combinaciones)
+
+        status_text.empty()
+        
+        if lista_resultados_memoria:
+            # Consolidamos todo en un solo DataFrame gigante
+            df_final = pd.concat(lista_resultados_memoria, ignore_index=True)
+            
+            # 🟢 GUARDAMOS EN LA MEMORIA DE SESIÓN PARA EL EXPLORADOR
+            st.session_state['df_multirrango'] = df_final 
+            
+            # Convertimos a CSV en memoria
+            csv_data = df_final.to_csv(index=False, sep=";").encode('utf-8')
+            
+            st.success("✨ ¡Informe multirrango completado con éxito!")
+            
+            # Botón nativo de descarga
+            st.download_button(
+                label="📥 Descargar Informe Completo (.csv)",
+                data=csv_data,
+                file_name="informe_cobertura_masivo.csv",
+                mime="text/csv",
+                type="primary"
+            )
+        else:
+            st.warning("No se generaron resultados con la configuración actual.")
+
+    # ==============================================================================
+    # 📊 EXPLORADOR TERMODINÁMICO INTERACTIVO (PLOTLY)
+    # ==============================================================================
+    # Se renderiza SOLAMENTE si existe el informe guardado en la memoria de sesión
+    if 'df_multirrango' in st.session_state:
+        df_explorador = st.session_state['df_multirrango'].copy()
+        
+        st.markdown("---")
+        st.markdown("### 📊 Explorador Termodinámico Interactivo")
+        st.write("Utiliza los filtros para auditar el comportamiento de los estimadores.")
+        
+        # 1. Ajuste automático de los nombres de columnas (según los emita la función base)
+        col_muestra = "µ(Valor Muestra)" if "µ(Valor Muestra)" in df_explorador.columns else "µ\n(SAMPLE)"
+        col_pob = "µ(Población Real)" if "µ(Población Real)" in df_explorador.columns else "µ\n(POBLATION)"
+        col_target = "Nivel Cobertura Objetivo (N)" if "Nivel Cobertura Objetivo (N)" in df_explorador.columns else "TARGET \nCOVERAGE"
+        col_estimador = "Estimador" if "Estimador" in df_explorador.columns else "COEFFICIENT"
+        col_k = "Escala k" if "Escala k" in df_explorador.columns else "k"
+        col_m = "Dimension m" if "Dimension m" in df_explorador.columns else "m"
+        col_n = "Dimension n" if "Dimension n" in df_explorador.columns else "n" # 🛠️ AÑADIDO: Detección de n
+        
+        # Detección exacta de la columna de Cobertura Poblacional
+        if "Cob. Población (%)" in df_explorador.columns:
+            col_cob_pob = "Cob. Población (%)"
+        elif "Cobertura Población (%)" in df_explorador.columns:
+            col_cob_pob = "Cobertura Población (%)"
+        else:
+            col_cob_pob = "POPULATION\nCOVERAGE (%)"
+        
+        # 2. Cálculo matemático del Sesgo (Bias)
+        if col_muestra in df_explorador.columns and col_pob in df_explorador.columns:
+            df_explorador["Sesgo (Bias)"] = df_explorador[col_muestra] - df_explorador[col_pob]
+        
+        # 3. Controles de Interfaz (Filtros persistentes) - 🛠️ Ahora con 4 columnas
+        col_f1, col_f2, col_f3, col_f4 = st.columns(4)
+        
+        with col_f1:
+            metricas_disp = ["Sesgo (Bias)", col_cob_pob]
+            metrica_sel = st.selectbox("Métrica a visualizar:", metricas_disp)
+            
+        with col_f2:
+            k_disponibles = sorted(df_explorador[col_k].unique())
+            k_sel = st.selectbox("Escala (k):", k_disponibles)
+            
+        with col_f3:
+            m_disponibles = sorted(df_explorador[col_m].unique())
+            m_sel = st.selectbox("Jueces (m):", m_disponibles)
+            
+        with col_f4:
+            # 🛠️ AÑADIDO: Filtro de Sujetos (n)
+            n_disponibles = sorted(df_explorador[col_n].unique())
+            n_sel = st.selectbox("Sujetos (n):", n_disponibles)
+
+        # 4. Filtrado del DataFrame aislando el hiperespacio exacto
+        df_filtrado = df_explorador[
+            (df_explorador[col_k] == k_sel) & 
+            (df_explorador[col_m] == m_sel) &
+            (df_explorador[col_n] == n_sel) # 🛠️ AÑADIDO: Filtro aplicado
+        ]
+
+        # 5. Renderizado en Plotly
+        if not df_filtrado.empty:
+            import plotly.express as px
+            
+            y_title = "Sesgo (Error Sistemático)" if metrica_sel == "Sesgo (Bias)" else "Cobertura Poblacional (%)"
+            
+            fig = px.line(
+                df_filtrado, 
+                x=col_target, 
+                y=metrica_sel, 
+                color=col_estimador,
+                markers=True,
+                title=f"Evolución de {y_title} (k={k_sel}, m={m_sel}, n={n_sel})", # 🛠️ AÑADIDO: n en el título
+                color_discrete_map={
+                    "NI (Marco N)": "#00CC96",          
+                    "NN (Marco N)": "#00CC96",          
+                    "NO (Marco N)": "#00CC96",          
+                    "Alpha Krippendorff": "#EF553B",    
+                    "ICC(2,1)": "#636EFA",              
+                    "Kappa Fleiss": "#FFA15A",          
+                    "Kendall W": "#AB63FA"              
+                }
+            )
+            
+            fig.update_layout(
+                hovermode="x unified",
+                xaxis=dict(title="Consenso Objetivo (Target N)", tickmode='linear', dtick=0.1),
+                yaxis=dict(title=y_title),
+                legend=dict(title="Estimador", orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            
+            if metrica_sel == col_cob_pob:
+                fig.update_yaxes(range=[0, 105])
+                fig.add_hline(y=95, line_dash="dash", line_color="green", annotation_text="Meta 95%")
+            
+            st.plotly_chart(fig, width="stretch")
+        else:
+            st.warning("No hay datos para esta combinación de parámetros.")
+
+# ==============================================================================
+# PESTAÑA 4: INVARIANZA TOPOLÓGICA
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '🔄 Invarianza Topológica':
     st.markdown("### Auditoría de Invarianza (Sensibilidad Muestral)")
@@ -406,14 +698,13 @@ elif st.session_state["pestaña_activa"] == '🔄 Invarianza Topológica':
         st.info("Sube una matriz y define k en el panel lateral.")
     else:
         c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
-        with c1: factor = st.number_input("Multiplicador (X veces):", 2, 200, 10)
+        with c1: factor = st.number_input("Multiplicador (X veces):", 2, 100000, 10)
         with c2: st.info(f"De **{n_sujetos}** a **{n_sujetos * factor}** sujetos.")
         
         if st.button("🔄 Ejecutar Test", type="primary"):
             m_rep = np.tile(matriz_empirica, (factor, 1))
             res_inv = []
             
-            # Compresión Termodinámica al vuelo para el Marco N
             dict_original = Counter(tuple(x) for x in matriz_empirica)
             dict_replicada = Counter(tuple(x) for x in m_rep)
             
@@ -464,7 +755,7 @@ elif st.session_state["pestaña_activa"] == '🔄 Invarianza Topológica':
                     except: 
                         return ['']*len(r)
                         
-                st.dataframe(df_inv.drop(columns=["Tipo"]).style.format({"Original": "{:.4f}", "Replicada": "{:.4f}", "Variación": "{:+.4f}"}).apply(style_inv, axis=1), use_container_width=True)
+                st.dataframe(df_inv.drop(columns=["Tipo"]).style.format({"Original": "{:.4f}", "Replicada": "{:.4f}", "Variación": "{:+.4f}"}).apply(style_inv, axis=1), width="stretch")
                 
                 st.markdown("### Resumen Ejecutivo: Estabilidad Estructural")
                 cols_inv = st.columns(len(df_inv))
@@ -479,7 +770,7 @@ elif st.session_state["pestaña_activa"] == '🔄 Invarianza Topológica':
                         cols_inv[i].metric(label=f"{est}", value=f"{rep:.4f}", delta=f"Inconsistente ({dif:+.4f})", delta_color="inverse")
 
 # ==============================================================================
-# PESTAÑA 4: GENERADOR DE MATRICES EXPERIMENTALES (SINTÉTICAS)
+# PESTAÑA 5: GENERADOR DE MATRICES EXPERIMENTALES (SINTÉTICAS)
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
     st.subheader("🏗️ Generador de Matrices Sintéticas")
@@ -498,7 +789,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
     if "df_base_1" not in st.session_state or st.session_state.get("gk_last_base1") != gen_k:
         st.session_state["df_base_1"] = pd.DataFrame(np.full((1, gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=["Prob (%)"])
         st.session_state["gk_last_base1"] = gen_k
-    edit_base_1 = st.data_editor(st.session_state["df_base_1"], use_container_width=True, key="edit_base_1")
+    edit_base_1 = st.data_editor(st.session_state["df_base_1"], width="stretch", key="edit_base_1")
 
     modo = st.radio("", ["Patrón global", "Patrón por sujeto"], horizontal=True)
     
@@ -508,7 +799,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
         if st.session_state.get("last_state_key") != (gen_n, gen_k, base_hash):
             st.session_state["df_n_rows"] = pd.DataFrame(np.tile(edit_base_1.values, (gen_n, 1)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=[f"S{i+1}" for i in range(gen_n)])
             st.session_state["last_state_key"] = (gen_n, gen_k, base_hash)
-        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], use_container_width=True)
+        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], width="stretch")
 
     st.markdown("#### Excepciones (Agujeros Negros)")
     excepciones = st.multiselect("Selecciona sujetos para inyectar anomalías:", [f"S{i+1}" for i in range(gen_n)])
@@ -518,7 +809,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
             st.session_state["df_exc"] = pd.DataFrame(np.full((len(excepciones), gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=excepciones)
             st.session_state["exc_last"] = excepciones
             st.session_state["exc_last_k"] = gen_k
-        edit_exc = st.data_editor(st.session_state["df_exc"], use_container_width=True)
+        edit_exc = st.data_editor(st.session_state["df_exc"],width="stretch")
 
     def crear_matriz_sintetica():
         matriz = []
@@ -547,14 +838,14 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        if st.button("Preparar Descarga", use_container_width=True):
+        if st.button("Preparar Descarga", width="stretch"):
             st.session_state['matriz_csv_temp'] = crear_matriz_sintetica()
         if 'matriz_csv_temp' in st.session_state:
             csv = st.session_state['matriz_csv_temp'].to_csv(index=False)
-            st.download_button("Descargar CSV", csv, "matriz_sintetica.csv", "text/csv", use_container_width=True)
+            st.download_button("Descargar CSV", csv, "matriz_sintetica.csv", "text/csv", width="stretch")
 
     with col_b2:
-        if st.button("🚀 Generar y Cargar en la App", type="primary", use_container_width=True):
+        if st.button("🚀 Generar y Cargar en la App", type="primary", width="stretch"):
             with st.spinner("Sintetizando..."):
                 df_sintetico = crear_matriz_sintetica()
                 import io
@@ -571,24 +862,49 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
                     'diccionario_estados': conteo_est, 
                     'n_total': n_tot, 
                     'k_escala': gen_k,
-                    'topologia_activa': 'Intervalar (Continua)', 
+                    'topologia_activa': 'Intervalar (Discreta/Continua)', 
                     'pestaña_activa': '📊 Cálculo del Consenso'
                 })
                 st.rerun()
 
 # ==============================================================================
-# PESTAÑA 5: DUELO DE PRECISIÓN N vs todos los demás
+# PESTAÑA 6: DUELO DE PRECISIÓN N vs Clásicos
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
     st.markdown("### ⚔️ Duelo de Precisión: N vs Clásicos")
     if k_escala is None:
         st.warning("⚠️ Debes definir el límite del hiperespacio (k) en el panel lateral.")
     else:
-        st.write("Esta simulación calcula el Error Cuadrático Medio (MSE) enfrentando la estimación de la muestra contra la Verdad Poblacional asintótica.")
+        st.write("Esta simulación calcula el Error Cuadrático Medio (MSE) y el Sesgo (Bias) enfrentando la estimación de la muestra contra la Verdad Poblacional asintótica.")
         
-        dim_n, dim_m = n_sujetos if matriz_empirica is not None else 50, m_jueces if matriz_empirica is not None else 7
+        # --- 1. SELECTOR DINÁMICO DE ESCENARIOS ---
+        escenarios = {
+            "Libre (Configuración Manual)": {},
+            "1. Paradoja de la Varianza Cero (Techo)": {"n": 50, "m": 5, "target": 0.96, "desc": "Fuerza un consenso casi absoluto. Demuestra cómo las métricas clásicas colapsan al carecer de varianza en las respuestas."},
+            "2. Muestras Pequeñas (Clínico/Expertos)": {"n": 8, "m": 3, "target": 0.65, "desc": "Simula un panel de expertos. Evalúa la robustez (MSE) cuando faltan datos para sostener la campana de Gauss asintótica."},
+            "3. Ruido y Dispersión (Caos)": {"n": 100, "m": 5, "target": 0.15, "desc": "Inyecta alta entropía. Comprueba si el estimador es capaz de identificar el desorden puro sin arrojar falsos positivos (Sesgo)."},
+            "4. Gran Escala (Stress Test Big Data)": {"n": 1500, "m": 10, "target": 0.50, "desc": "Simula un entorno de alto volumen. Valida si el error del estimador tiende a cero o si arrastra un sesgo sistemático."}
+        }
+        
+        st.markdown("#### 🎯 Configuración del Escenario")
+        escenario_sel = st.selectbox("Selecciona el tipo de auditoría:", list(escenarios.keys()))
+        
+        # --- 2. ASIGNACIÓN DE PARÁMETROS SEGÚN ESCENARIO ---
+        if escenario_sel != "Libre (Configuración Manual)":
+            st.info(f"💡 **Objetivo de la prueba:** {escenarios[escenario_sel]['desc']}")
+            dim_n = escenarios[escenario_sel]["n"]
+            dim_m = escenarios[escenario_sel]["m"]
+            target_preset = escenarios[escenario_sel]["target"]
+            modo_libre = False
+            st.markdown(f"> **Dimensiones de la matriz bloqueadas:** $n={dim_n}$ sujetos $\\times$ $m={dim_m}$ jueces.")
+        else:
+            dim_n = n_sujetos if matriz_empirica is not None else 50
+            dim_m = m_jueces if matriz_empirica is not None else 7
+            target_preset = None
+            modo_libre = True
 
-        with st.spinner("Calculando límites del hiperespacio..."):
+        # --- 3. CÁLCULO DE LÍMITES TERMODINÁMICOS ---
+        with st.spinner("Calculando fronteras termodinámicas del hiperespacio..."):
             if "Intervalar" in topologia:
                 azar_N = ni_core.calcular_azar_termodinamico_ni(dim_m, k_escala)
                 min_N = 0.0 
@@ -597,54 +913,97 @@ elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
                 macro_dict = nn_core._build_macrostate_dictionary_nn(dim_m, k_escala)
                 min_N = np.sqrt(min(macro_dict.keys())) 
             else: 
-                _, _, _, min_N = no_core.analizar_termodinamica_no(dim_n, dim_m, k_escala)
-                azar_N = np.sqrt(1.0 / k_escala)
+                azar_N, _, _, min_N = no_core.analizar_termodinamica_no(dim_n, dim_m, k_escala)
         
-        n_duelo = st.slider("Experimentos (Rondas de disparo)", 10, 200, 50)
-        target_N = st.slider(
-            "Consenso Objetivo (Tirador IA):", 
-            min_value=float(min_N), max_value=1.0000, value=float(azar_N), step=0.0100, format="%.4f", key="slider_duelo"
-        )
+        # --- 4. CONTROLES DE LA SIMULACIÓN ---
+        st.markdown("#### ⚙️ Parámetros de Disparo")
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            n_duelo = st.slider("Experimentos (Universos paralelos a generar)", 10, 200, 50)
+            
+        with col_d2:
+            # Determinamos el target a usar (Protegido siempre por el mínimo físico)
+            val_default = target_preset if not modo_libre else float(np.clip(azar_N, min_N, 1.0))
+            val_default = float(np.clip(val_default, min_N, 1.0))
+            
+            target_N = st.slider(
+                "Consenso Objetivo (Tirador IA):", 
+                min_value=float(min_N), max_value=1.0000, value=val_default, step=0.0100, format="%.4f", 
+                disabled=not modo_libre # Se bloquea si estamos en un escenario forzado
+            )
         
+        # --- 5. EJECUCIÓN Y TABLA DE RESULTADOS ---
         if st.button("🔥 Iniciar Combate de Precisión", type="primary"):
-            with st.spinner("Calculando trayectorias y calculando MSE..."):
+            with st.spinner(f"Simulando {n_duelo} universos geométricos y calculando MSE/Bias..."):
                 resultados = ejecutar_duelo_ia(topologia, dim_n, dim_m, k_escala, target_N, n_duelo, replicas)
                 
                 if resultados:
                     df_duel = pd.DataFrame(resultados)
-                    st.markdown("### 📊 Resultado del Duelo")
+                    st.markdown("### 📊 Resultado del Duelo de Precisión")
                     
-                    c1, c2, c3 = st.columns(3)
+                    # 🧹 PURGA DE COBERTURA: Eliminamos la información defensiva para centrarnos en el ataque (precisión)
+                    cols_cobertura = [c for c in df_duel.columns if "cobertura" in c.lower() or "cob" in c.lower()]
+                    df_duel = df_duel.drop(columns=cols_cobertura, errors='ignore')
+                    
+                    c1, c2 = st.columns(2)
                     try:
-                        n_mse = float(df_duel.iloc[0]["MSE (Error)"])
-                        a_mse = float(df_duel.iloc[1]["MSE (Error)"])
-                        n_cob = float(df_duel.iloc[0]["Cobertura (%)"].replace('%',''))
-                        a_cob = float(df_duel.iloc[1]["Cobertura (%)"].replace('%',''))
+                        col_mse = [c for c in df_duel.columns if "mse" in c.lower()][0]
+                        # Buscamos de forma dinámica la columna de Sesgo (Bias) si la genera la función
+                        col_bias = [c for c in df_duel.columns if "bias" in c.lower() or "sesgo" in c.lower()][0]
                         
-                        c1.metric("Fiabilidad N (Cob)", f"{n_cob}%", f"{n_cob - a_cob:.1f}% vs Alfa")
-                        c2.metric("Precisión N (MSE)", f"{n_mse:.6f}", f"{n_mse - a_mse:.6f} vs Alfa", delta_color="inverse")
-                    except:
+                        n_mse = float(df_duel.iloc[0][col_mse])
+                        a_mse = float(df_duel.iloc[1][col_mse])
+                        
+                        n_bias = float(df_duel.iloc[0][col_bias])
+                        a_bias = float(df_duel.iloc[1][col_bias])
+                        
+                        c1.metric("Precisión N (MSE)", f"{n_mse:.6f}", f"{n_mse - a_mse:+.6f} vs Clásico", delta_color="inverse")
+                        c2.metric("Sesgo N (Bias)", f"{n_bias:.6f}", f"{abs(n_bias) - abs(a_bias):+.6f} magnitud vs Clásico", delta_color="inverse")
+                    except Exception as e: 
+                        # Si `ejecutar_duelo_ia` no exporta Bias explícitamente, al menos mostramos el MSE sin quebrar la app
                         pass
-                        
-                    st.dataframe(df_duel.style.highlight_min(subset=["MSE (Error)"], color="lightgreen"), use_container_width=True)
+                    
+                    # Resaltar automáticamente en verde la fila con menor MSE
+                    col_mse_target = [c for c in df_duel.columns if "mse" in c.lower()]
+                    if col_mse_target:
+                        st.dataframe(df_duel.style.highlight_min(subset=col_mse_target, color="lightgreen"), width="stretch")
+                    else:
+                        st.dataframe(df_duel, width="stretch")
 
 # ==============================================================================
-# PESTAÑA 6: MANUAL DE USUARIO Y FUNDAMENTOS TEÓRICOS
+# PESTAÑA 7: MANUAL DE USUARIO Y FUNDAMENTOS TEÓRICOS
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
         st.video("https://youtu.be/XSpIfelUrZU")
+        
     with col3:
         st.write(""); st.write(""); st.write(""); st.write("")
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-        st.link_button(
-            "📄 Leer N-Metrics Logic Blueprint (PDF)", 
-            "https://docs.google.com/viewer?url=https://raw.githubusercontent.com/manuel-narsa/n-metrics/main/N-Metrics_Logic_Blueprint.pdf",
-            use_container_width=True
-        )
+        
+        # 1. Construimos la ruta dinámica al archivo PDF
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
+        
+        # 2. Comprobamos que el archivo existe en el servidor para evitar errores
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as pdf_file:
+                st.download_button(
+                    label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
+                    data=pdf_file,
+                    file_name="N-Metrics_Logic_Blueprint.pdf",
+                    mime="application/pdf",
+                    width="stretch"
+                )
+        else:
+            st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
+            st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
         st.markdown("</div>", unsafe_allow_html=True)
+        
     with col2:
         st.video("https://youtu.be/f0LMSS5LEho")
 
@@ -652,9 +1011,21 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
     
     st.markdown("---")
-    st.markdown("### 1. Carga de Datos y Topología (Panel Lateral)")
+    st.markdown("### 1. El Motor Termodinámico: El Valor Poblacional")
+    st.write("La mayor innovación de esta plataforma radica en cómo descubre la **Verdad Asintótica** (Pob. Real) de tus datos. La estadística clásica calcula directamente sobre tu muestra asumiendo que representa a la población. El Marco N proyecta tu muestra sobre su Espacio de Configuración infinito.")
+    st.markdown("""
+    * **1. Extracción de Macroestados:** El algoritmo aísla los patrones topológicos puros de tu matriz (las firmas de consenso), ignorando el ruido y el orden de los sujetos.
+    * **2. Multiplicidad Teórica ($\\Omega$):** Utilizando combinatoria exacta, calcula el 'volumen' geométrico que ocupa cada patrón en el universo total de probabilidades.
+    * **3. Proyección Asintótica:** Pondera las frecuencias de tu muestra empírica cruzándolas con su volumen teórico. Esto reconstruye matemáticamente cómo sería tu matriz si tuvieras infinitos sujetos ($n \\to \\infty$).
+    * **Impacto en el Sistema:** Este Valor Poblacional exacto es el núcleo de las tres pestañas principales:
+        * **📊 Cálculo de Consenso:** Te muestra este valor para revelarte el consenso 'puro' de tu muestra sin ruido estadístico.
+        * **🎯 Pruebas de Cobertura:** Se utiliza como la diana exacta que los Intervalos de Confianza (IC) generados deben intentar atrapar en las simulaciones.
+        * **📈 Informe Multirrango:** Escala este cálculo para auditar miles de configuraciones espaciales ($n, m, k$) de forma masiva.
+    """)
+
+    st.markdown("---")
+    st.markdown("### 2. Carga de Datos y Topología (Panel Lateral)")
     st.write("El primer paso es suministrar la materia prima y definir las leyes físicas del hiperespacio de probabilidad.")
-    
     st.markdown("""
     * **Archivo CSV:** Sube tu matriz empírica. El formato es estricto: **Sujetos en las filas ($n$)** y **Jueces/Evaluadores en las columnas ($m$)**. 
         * 🤖 *Autolimpiador Inteligente:* No te preocupes si tu Excel tiene cabeceras (ej. "Juez 1", "Evaluador A") o si la primera columna tiene los nombres de los sujetos (ej. "S001", "Paciente X"). El sistema lo detectará heurísticamente y recortará la matriz para procesar solo los datos puros.
@@ -666,7 +1037,7 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     """)
     
     st.markdown("---")
-    st.markdown("### 2. Generador de Matrices Sintéticas (Pestaña 4)")
+    st.markdown("### 3. Generador de Matrices Sintéticas (Pestaña 4)")
     st.write("Crea matrices termodinámicas a medida para probar las capacidades del sistema o generar casos de estudio controlados.")
     st.markdown("""
     * **1. Patrón Base (Norma):** Define las probabilidades (pesos) de que un juez elija cada categoría.
@@ -677,7 +1048,7 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     """)
 
     st.markdown("---")
-    st.markdown("### 3. Inferencia de Consenso: Marco N vs Clásicos (Pestaña 1)")
+    st.markdown("### 4. Inferencia de Consenso: Marco N vs Clásicos (Pestaña 1)")
     st.write("Esta sección somete tu matriz a una batalla de estimadores. El Marco N utiliza **Simulación Ponderada (SP)** para no anclarse al sesgo empírico.")
     st.markdown("""
     * **Consenso vs. Fiabilidad:** Los estimadores clásicos (como ICC o Alpha de Krippendorff) miden en realidad *Varianza*. Si tu matriz es muy homogénea (todos los sujetos son de sobresaliente y los jueces aciertan), estas métricas colapsarán y dirán que no hay fiabilidad. El **Marco N** mide verdadero *Consenso Geométrico*, manteniéndose estable aunque la varianza sea cero.
@@ -686,61 +1057,72 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     """)
 
     st.markdown("---")
-    st.markdown("""
-    ### 4. Auditoría Estructural: Escáner de Anomalías
-    Identifica qué elementos de la matriz (sujetos problemáticos o jueces erráticos) están inyectando entropía excesiva en el sistema.
-
-    El algoritmo calcula el **Acuerdo Local** de cada fila y lo compara con la termodinámica general de tu matriz. Marcará en rojo aquellos casos que caigan por debajo de un Límite Crítico dinámico, definido por el umbral de sensibilidad ($\sigma$) que tú elijas:
-    """)
+    st.markdown("### 5. Auditoría Estructural: Escáner de Anomalías")
+    st.write("Identifica qué elementos de la matriz (sujetos problemáticos o jueces erráticos) están inyectando entropía excesiva en el sistema. El algoritmo calcula el **Acuerdo Local** de cada fila y lo compara con la termodinámica general de tu matriz. Marcará en rojo aquellos casos que caigan por debajo de un Límite Crítico dinámico, definido por el umbral de sensibilidad ($\\sigma$) que tú elijas:")
     st.latex(r"Límite = \mu_{local} - (\text{Umbral} \cdot \sigma_{local})")
 
     st.markdown("---")
+    st.markdown("### 6. Pruebas de Estrés y Diagnóstico (Pestañas 2 y 3)")
+    st.write("Herramientas avanzadas para auditar la honestidad matemática de los estimadores:")
     st.markdown("""
-    ### 5. Pruebas de Estrés y Diagnóstico (Pestañas 2 y 3)
-    Herramientas avanzadas para auditar la honestidad matemática de los estimadores:
     * **Auditoría de Cobertura (Stress Test):** Simula decenas de universos paralelos ensamblando tuplas combinatorias exactas. Demuestra cómo las métricas clásicas sufren de "Ceguera Espacial" y no logran capturar la Verdad Poblacional, mientras el Marco N mantiene una cobertura de seguridad.
     * **Auditoría de Invarianza:** El consenso debe ser una *Propiedad Intensiva* (como la temperatura: el agua hierve a 100ºC sea un vaso o un océano). Esta prueba clona tu matriz multiplicando artificialmente el número de sujetos ($n$). Verás cómo el Marco N se mantiene inalterable (Invariante), mientras que los estimadores clásicos bailan y cambian de valor arrastrados por los grados de libertad.
     """)
-    st.markdown("---")
+    
+    st.markdown("#### 📊 El Explorador Termodinámico Interactivo")
+    st.write("Una vez generado un **Informe Multirrango** masivo, se desbloqueará un panel gráfico interactivo en la Pestaña 3. Este explorador te permite cruzar dinámicamente las dimensiones estructurales del hiperespacio ($k$ y $m$) para observar cómo las métricas de consenso reaccionan ante diferentes niveles de exigencia (Consenso Objetivo). Podrás visualizar dos grandes indicadores de rendimiento:")
+    
     st.markdown("""
-    ### ⚔️ Guía del Duelo de Titanes (N vs. Krippendorff)
+    **1. Cobertura Poblacional (%):**
+    Indica el porcentaje de veces que el Intervalo de Confianza (IC) del estimador logró "atrapar" o contener el verdadero consenso poblacional generado en el universo. El estándar del rigor científico exige que esta línea no caiga nunca por debajo de la barrera del **95%**.
     
-    Esta pestaña es un **laboratorio de estrés estadístico** diseñado para auditar la precisión de las métricas en condiciones críticas de Inteligencia Artificial. Aquí se enfrenta el **Marco Termodinámico N** contra el estándar actual, el **Alfa de Krippendorff (AK)**.
+    **2. El Sesgo (Bias):**
+    Es el error matemático sistemático de una métrica. Se calcula restando el valor real poblacional a lo que la métrica ha estimado con la muestra ($Bias = \\mu_{muestra} - \\mu_{poblacion}$).
+    * **Un sesgo de 0.0000 (Línea central):** Es el ideal termodinámico. Significa que la métrica es un "francotirador" analítico perfecto; sus disparos son siempre limpios y no se deja engañar por el ruido de la muestra.
+    * **Un sesgo positivo (ej. +0.15):** Indica que la métrica es *falsamente optimista*. Ante la falta de varianza (por ejemplo, cuando todos los jueces coinciden en la misma categoría), la métrica clásica "infla" artificialmente el resultado, diciendo que existe más consenso del que matemáticamente hay.
+    * **Un sesgo negativo (ej. -0.15):** Indica que la métrica es *falsamente pesimista*. El estimador está castigando injustamente a los evaluadores y devolviendo una fiabilidad menor a la que realmente demostraron empíricamente.
+    """)
+
+    st.markdown("---")
+    st.markdown("### ⚔️ 7. Guía del Duelo de Titanes (N vs. Clásicos)")
+    st.write("Esta pestaña es un **laboratorio de estrés estadístico** diseñado para auditar la precisión de las métricas en condiciones críticas de Inteligencia Artificial. Aquí se enfrenta el **Marco Termodinámico N** contra los estándares actuales (Alfa de Krippendorff, Fleiss, ICC).")
     
-    #### 🧪 Descripción de los Experimentos
+    st.markdown("#### ⚖️ Transparencia Epistemológica: ¿Está el duelo amañado?")
+    st.write("Una duda científica legítima es preguntarse si evaluar a los estimadores clásicos sobre universos generados por el motor termodinámico de N supone una ventaja injusta ('jugar con las reglas de N'). **La respuesta matemática es no.**")
+    st.write("El espacio de configuración no es una invención geométrica propia, sino la aplicación estricta de la **Teoría de la Probabilidad Discreta (Combinatoria Pura)**. La estadística clásica del siglo XX, por limitaciones computacionales, adoptó aproximaciones asintóticas (basadas en la varianza) asumiendo que los datos siempre tenderían a una distribución normal. Cuando este simulador construye una matriz masiva basada en probabilidades combinatorias exactas y se la entrega a Krippendorff, le está proporcionando el ecosistema empírico perfecto. Si el coeficiente clásico falla al evaluar ese universo infinito, demuestra que su aproximación algebraica original contiene un **sesgo estructural (Bias)** ineludible, validando que el error no proviene de 'las reglas del juego', sino de la métrica misma.")
     
+    st.markdown("#### 🧪 Descripción de los Experimentos")
+    st.markdown("""
     1. **Paradoja de la Varianza Cero (Techo de Escala)**
        * **Objetivo:** Evaluar el comportamiento cuando existe un acuerdo casi total en una sola categoría.
        * **Dinámica:** Se genera una matriz donde los jueces coinciden masivamente. La estadística clásica suele colapsar (Bias alto) al no encontrar "varianza" que procesar.
-       * **Dimensiones:** Sujetos ($N$) y Jueces ($M$) moderados, con un objetivo de concordancia ($target\_N$) > 0.9.
+       * **Dimensiones:** Sujetos ($n$) y Jueces ($m$) moderados, con un objetivo de concordancia ($target\\_N$) > 0.9.
     
     2. **Estabilidad en Muestras Pequeñas (Expertos)**
        * **Objetivo:** Simular auditorías de alta especialización (médica/legal) con muy pocos evaluadores.
-       * **Dinámica:** Se fuerza un escenario de $N < 10$ y $M$ entre 2 y 3. Demuestra si la métrica es capaz de extraer la "verdad" con recursos mínimos sin sesgarse.
-       * **Dimensiones:** $N$ muy pequeño, $M$ mínimo, Escala $K$ completa.
+       * **Dinámica:** Se fuerza un escenario de $n < 10$ y $m$ entre 2 y 3. Demuestra si la métrica es capaz de extraer la "verdad" con recursos mínimos sin sesgarse.
+       * **Dimensiones:** $n$ muy pequeño, $m$ mínimo, Escala $k$ completa.
     
     3. **Ruido y Dispersión (Entropía Máxima)**
        * **Objetivo:** Medir la capacidad de la métrica para identificar el caos.
-       * **Dinámica:** Se genera una matriz de votos aleatorios o altamente discrepantes. N utiliza la entropía de configuración para penalizar el desorden de forma más quirúrgica.
-       * **Dimensiones:** $N$ y $M$ estándar, $target\_N$ bajo (< 0.3).
+       * **Dinámica:** Se genera una matriz de votos altamente discrepantes. Comprueba si los estimadores clásicos arrojan "falsos positivos" de consenso al ser engañados por el ruido.
+       * **Dimensiones:** $n$ y $m$ estándar, $target\\_N$ bajo (< 0.3).
     
-    4. **Gran Escala (Stress Test de 1 Millón)**
-       * **Objetivo:** Validar la consistencia asintótica para Big Data e IA.
-       * **Dinámica:** Proyecta el comportamiento de la métrica hacia un millón de registros. Busca detectar si el error disminuye con el volumen o si la métrica arrastra un error sistemático (Bias).
-       * **Dimensiones:** $N$ proyectado a $10^6$, $M$ variable.
+    4. **Gran Escala (Stress Test Big Data)**
+       * **Objetivo:** Validar la consistencia asintótica para Inteligencia Artificial.
+       * **Dinámica:** Proyecta el comportamiento de la métrica hacia miles de registros. Busca detectar si el error intrínseco desaparece con el volumen, o si arrastra un sesgo sistemático permanente.
+       * **Dimensiones:** $n \\to 1500$, $m$ variable.
+    """)
     
-    #### 📊 Glosario de Métricas de Auditoría
-    
-    Para demostrar la superioridad de un método sobre otro, observamos cuatro indicadores clave:
-    
-    * **Cobertura (%):** Porcentaje de veces que el intervalo de confianza atrapó la "Verdad Poblacional". El estándar científico de fiabilidad es el **95%**.
-    * **MSE (Error Cuadrático Medio):** Es la métrica de precisión por excelencia en IA. Mide cuánto se aleja el valor estimado de la realidad. **Cuanto más bajo (cerca de 0), mejor.**
-    * **Ancho IC (Eficiencia):** Indica la incertidumbre. Un intervalo más estrecho que mantiene una alta cobertura es señal de una métrica más potente y eficiente.
-    * **Bias (Sesgo):** Indica si la métrica tiende a ser pesimista (negativo) u optimista (positivo). El valor ideal para una auditoría objetiva es **0.00**.
+    st.markdown("#### 📊 Glosario de Métricas de Auditoría")
+    st.write("Para demostrar la superioridad matemática de un método, el simulador observa dos indicadores clave durante el combate (notar que la 'Cobertura' se evalúa en su propia pestaña dedicada):")
+    st.markdown("""
+    * **Precisión (MSE - Error Cuadrático Medio):** Es la métrica de precisión por excelencia en IA. Mide cuánto se aleja el disparo del estimador de la Verdad Poblacional exacta. **Cuanto más bajo (cerca de 0.0000), mejor.**
+    * **Sesgo (Bias):** Indica si la métrica tiene un "prejuicio matemático" que le hace tender a sobrestimar (positivo) o subestimar (negativo) el consenso real de forma sistemática. El valor perfecto de un estimador honesto es **0.0000**.
     """)
 
 # ==============================================================================
-# PESTAÑA 7: AUTORÍA Y LICENCIA
+# PESTAÑA 8: AUTORÍA Y LICENCIA
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
     st.markdown("### Código Abierto y Transparencia")
@@ -766,7 +1148,7 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
     st.markdown("### 🎓 Cómo citar este trabajo")
     st.write("Si utilizas N-Metrics o el Marco Termodinámico N en tu investigación, por favor cita el manuscrito original:")
     
-    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Zenodo. https://doi.org/10.5281/zenodo.20075069")
+    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Zenodo. https://doi.org/10.5281/zenodo.20547816")
     
     with st.expander("Ver formato BibTeX para LaTeX"):
         st.code("""@article{narbona_n_coefficient,
@@ -774,5 +1156,5 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
   author={Narbona Sarria, Manuel},
   journal={Preprint},
   year={2026},
-  url={https://doi.org/10.5281/zenodo.20075069}
+  url={https://doi.org/10.5281/zenodo.20589453}
 }""", language="bibtex")

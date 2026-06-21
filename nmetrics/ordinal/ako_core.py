@@ -3,24 +3,29 @@ import pandas as pd
 from math import comb
 
 # ==============================================================================
-# 1. Motor Vectorizado de AKO Clásico
+# REEMPLAZO EN ako_core.py: CONTEO AGNÓSTICO PARA ALFA ORDINAL
 # ==============================================================================
-def _compute_ako_vectorized(X_3d, k_escala):
+def _compute_ako_vectorized(X_3d, k_escala=None):
+    """Calcula el Alpha Ordinal de Krippendorff usando categorías dinámicas."""
     S, n, m = X_3d.shape
-    k = k_escala
     N_total = n * m
-
+    
+    # Extraemos solo los valores únicos existentes (ordenados de menor a mayor)
+    unique_vals = np.sort(np.unique(X_3d[~np.isnan(X_3d)]))
+    k = len(unique_vals)
+    
     freqs = np.zeros((S, k))
     row_freqs = np.zeros((S, n, k))
     
-    for v in range(k):
-        mask = (X_3d == (v + 1))
+    for v, val in enumerate(unique_vals):
+        mask = (X_3d == val)
         freqs[:, v] = np.sum(mask, axis=(1, 2))
         row_freqs[:, :, v] = np.sum(mask, axis=2)
 
     D = np.zeros((S, k, k))
     for c in range(k):
         for k_val in range(c + 1, k):
+            # La suma de frecuencias ignora los ceros de forma nativa
             s_val = np.sum(freqs[:, c:k_val+1], axis=1)
             d = s_val - freqs[:, c]/2.0 - freqs[:, k_val]/2.0
             D[:, c, k_val] = d**2
