@@ -1,5 +1,6 @@
 streamlit
 pandas
 numpy
-matplotlib
-n-metrics==0.4.0
+scipy
+plotly
+Pillow
