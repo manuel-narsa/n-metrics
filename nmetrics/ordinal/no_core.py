@@ -182,10 +182,14 @@ def analizar_termodinamica_no(n_sujetos, m_jueces, k_escala, valor_observado=Non
     
     return float(azar_esperado), info_estructura, float(percentil_obs), float(min_N)
 
+
 # ==============================================================================
 # 3. MOTOR DE INFERENCIA UNIFICADA (Producto Punto - Big Data Ready)
 # ==============================================================================
 def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
+    import numpy as np
+    from scipy.special import gammaln
+    
     estados_lista = list(dict_estados.keys())
     f_t = np.array(list(dict_estados.values()), dtype=float)
     n_total = int(np.sum(f_t))
@@ -196,8 +200,9 @@ def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
         raise ValueError("La matriz contiene datos no numéricos.")
 
     U, m = X_estados.shape
+    m_valid = np.sum(~np.isnan(X_estados), axis=1)
 
-    # Conversión Topológica a Rangos Densos
+    # 1. Conversión Topológica a Rangos Densos y Coincidencias
     R_estados = np.zeros_like(X_estados, dtype=float)
     for j in range(m):
         col = X_estados[:, j]
@@ -209,10 +214,8 @@ def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
             R_estados[mask, j] = [mapping[v] for v in valid]
         R_estados[~mask, j] = np.nan
 
-    # Extracción de Coincidencias Cruzadas
     match_u_j = np.zeros((U, m), dtype=float)
     pos_u_j = np.zeros((U, m), dtype=float)
-
     for j in range(m):
         val_j = R_estados[:, j]
         valid_j = ~np.isnan(val_j)
@@ -220,123 +223,96 @@ def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
             if j == k: continue
             val_k = R_estados[:, k]
             valid_k = ~np.isnan(val_k)
-            
             both_valid = valid_j & valid_k
             match_u_j[:, j] += (both_valid & (val_j == val_k)).astype(float)
             pos_u_j[:, j] += both_valid.astype(float)
 
-    # Motor base de evaluación (Permite ponderar filas y columnas)
-    def _no_desde_pesos(w_rows, w_cols=None):
+    def _no_desde_pesos(w_rows):
         if w_rows.ndim == 1: w_rows = w_rows[None, :]
         C_j = np.dot(w_rows, match_u_j)
         P_j = np.dot(w_rows, pos_u_j)
-        
         with np.errstate(divide='ignore', invalid='ignore'):
             A_j = np.where(P_j > 0, C_j / P_j, np.nan)
-            
-        if w_cols is None:
-            mu = np.nanmean(A_j, axis=1)
-            sigma = np.nanstd(A_j, axis=1)
-        else:
-            if w_cols.ndim == 1: w_cols = w_cols[None, :]
-            valid = ~np.isnan(A_j)
-            w_valid = np.where(valid, w_cols, 0.0)
-            sum_w = np.sum(w_valid, axis=1, keepdims=True)
-            w_norm = np.where(sum_w > 0, w_valid / sum_w, 0.0)
-
-            # --- CORRECCIÓN ANTI-NaNs ---
-            # Transformamos los NaNs en 0.0 para que la suma matemática no se infecte
-            A_j_safe = np.nan_to_num(A_j, nan=0.0)
-            
-            mu = np.sum(A_j_safe * w_norm, axis=1)
-            var = np.sum(w_norm * (A_j_safe - mu[:, None])**2, axis=1)
-            sigma = np.sqrt(var)
-            
+        mu = np.nanmean(A_j, axis=1)
+        sigma = np.nanstd(A_j, axis=1)
         return np.sqrt(np.maximum(mu * (1.0 - sigma), 0.0))
 
-    # Muestra Real (Frecuencias empíricas de los sujetos, jueces con peso plano)
-    no_muestra = _no_desde_pesos(f_t)[0]
+    # ---------------------------------------------------------
+    # NO MUESTRA
+    # ---------------------------------------------------------
+    w_muestra = f_t / n_total
+    # Protección decimales
+    w_muestra = w_muestra / np.sum(w_muestra)
+    w_muestra[-1] = 1.0 - np.sum(w_muestra[:-1])
+    w_muestra = np.clip(w_muestra, 0.0, 1.0)
+    
+    no_muestra = _no_desde_pesos(w_muestra)[0]
 
-    # ==============================================================================
-    # Re-ponderación Bayesiana (Espacio de Configuraciones de las COLUMNAS/JUECES)
-    # ==============================================================================
-    counts_j = np.zeros((m, k_escala))
+    # ---------------------------------------------------------
+    # NO POBLACIÓN (Corrección Termodinámica de Filas)
+    # ---------------------------------------------------------
+    counts = np.zeros((U, k_escala))
     X_clip = np.floor(X_estados + 0.5)
     X_clip = np.clip(X_clip, 1, k_escala)
     
-    # Reconstruimos la distribución categórica que usó cada juez en la matriz real
-    for j in range(m):
-        valid_mask = ~np.isnan(X_clip[:, j])
-        for k_val in range(1, k_escala + 1):
-            counts_j[j, k_val-1] = np.sum(f_t[valid_mask & (X_clip[:, j] == k_val)])
+    # Extraer conteos agnósticos por estado (fila)
+    for k_val in range(1, k_escala + 1):
+        counts[:, k_val-1] = np.sum(X_clip == k_val, axis=1)
 
-    R_j = np.sum(counts_j > 0, axis=1)
-    n_valid_j = np.zeros(m)
-    for j in range(m):
-        n_valid_j[j] = np.sum(f_t[~np.isnan(X_clip[:, j])])
-
-    # 1. Multiplicidad Termodinámica Teórica por Juez (Binomial + Multinomial)
-    log_comb_j = gammaln(k_escala + 1) - gammaln(R_j + 1) - gammaln(k_escala - R_j + 1)
-    log_multi_j = gammaln(n_valid_j + 1) - np.sum(gammaln(counts_j + 1), axis=1)
+    counts_rounded = np.round(counts, 4)
+    # IMPORTANTE: En Ordinal NO hay np.sort(). La posición importa.
+    unique_counts, inverse_idx = np.unique(counts_rounded, axis=0, return_inverse=True)
     
-    log_omega_j = log_comb_j + log_multi_j
-    omega_teorico_j = np.exp(log_omega_j - np.max(log_omega_j))
+    f_M = np.zeros(len(unique_counts))
+    np.add.at(f_M, inverse_idx, f_t)
+    f_M_mapped = f_M[inverse_idx]
 
-    # 2. Corrección de frecuencias empíricas de las firmas de jueces
-    counts_rounded_j = np.round(counts_j, 4)
-    _, inverse_idx_j, freq_j = np.unique(counts_rounded_j, axis=0, return_inverse=True, return_counts=True)
-    f_emp_j = freq_j[inverse_idx_j]
-
-    # 3. Pesos poblacionales para las columnas (Jueces)
-    omega_corregido_j = omega_teorico_j / f_emp_j
-    sum_omega_j = np.sum(omega_corregido_j)
-    w_jueces_pob = omega_corregido_j / sum_omega_j if sum_omega_j > 0 else np.ones(m) / m
-
-    # Población Asintótica Estimada (Sujetos empíricos + Jueces ponderados topológicamente)
-    no_poblacion = _no_desde_pesos(f_t, w_cols=w_jueces_pob)[0]
-
-    # ==============================================================================
-    # Bootstrap Combinatorio (Vectorizado)
-    # ==============================================================================
-    safe_n = max(n_total, 2)
+    # Multiplicidad exclusiva de permutación de jueces (sin mover categorías)
+    log_omega = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
+    omega_teorico = np.exp(log_omega - np.max(log_omega))
     
-    # 1. Remuestreamos las filas empíricas
-    f_boot = np.random.multinomial(safe_n, f_t / n_total, size=replicas) # Forma: (replicas, U)
+    w_pob = np.where((m_valid > 1) & (f_M_mapped > 0), f_t * (omega_teorico / f_M_mapped), 0.0)
+    sum_wpob = np.sum(w_pob)
     
-    # 2. Vectorizamos la extracción de conteos de los jueces para todas las réplicas
-    counts_boot = np.zeros((replicas, m, k_escala))
-    for j in range(m):
-        valid_mask = ~np.isnan(X_clip[:, j])
-        for k_val in range(1, k_escala + 1):
-            mask = valid_mask & (X_clip[:, j] == k_val)
-            counts_boot[:, j, k_val-1] = np.sum(f_boot[:, mask], axis=1)
-            
-    R_boot = np.sum(counts_boot > 0, axis=2) # Forma: (replicas, m)
-    n_valid_boot = np.zeros((replicas, m))
-    for j in range(m):
-        n_valid_boot[:, j] = np.sum(f_boot[:, ~np.isnan(X_clip[:, j])], axis=1)
-
-    # 3. Calculamos Omega para todas las réplicas simultáneamente
-    log_comb_boot = gammaln(k_escala + 1) - gammaln(R_boot + 1) - gammaln(k_escala - R_boot + 1)
-    log_multi_boot = gammaln(n_valid_boot + 1) - np.sum(gammaln(counts_boot + 1), axis=2)
-    
-    log_omega_boot = log_comb_boot + log_multi_boot
-    max_log_boot = np.max(log_omega_boot, axis=1, keepdims=True)
-    omega_teorico_boot = np.exp(log_omega_boot - max_log_boot)
-
-    w_jueces_boot = np.zeros((replicas, m))
-    for r in range(replicas):
-        counts_r = np.round(counts_boot[r], 4)
-        _, inv_idx, frq = np.unique(counts_r, axis=0, return_inverse=True, return_counts=True)
-        w_jueces_boot[r] = omega_teorico_boot[r] / frq[inv_idx]
+    if sum_wpob > 0:
+        w_pob = w_pob / sum_wpob
+    else:
+        w_pob = np.ones_like(w_pob) / len(w_pob)
         
-        sum_w_r = np.sum(w_jueces_boot[r])
-        if sum_w_r > 0:
-            w_jueces_boot[r] /= sum_w_r
-        else:
-            w_jueces_boot[r] = 1.0 / m
+    w_pob[-1] = 1.0 - np.sum(w_pob[:-1])
+    w_pob = np.clip(w_pob, 0.0, 1.0)
+    
+    no_poblacion = _no_desde_pesos(w_pob)[0]
 
-    # 4. Cálculo final de NO para las 1000 iteraciones en un solo disparo de Numpy
-    sims = _no_desde_pesos(f_boot, w_cols=w_jueces_boot)
+    # ---------------------------------------------------------
+    # BOOTSTRAP COMBINATORIO
+    # ---------------------------------------------------------
+    safe_n = max(n_total, 2)
+    p_boot = f_t / n_total
+    p_boot[-1] = 1.0 - np.sum(p_boot[:-1])
+    p_boot = np.clip(p_boot, 0.0, 1.0)
+    
+    f_boot = np.random.multinomial(safe_n, p_boot, size=replicas)
+    
+    # Calculamos la topología para todas las réplicas en bloque
+    w_boot = np.zeros((replicas, U))
+    for r in range(replicas):
+        f_M_r = np.zeros(len(unique_counts))
+        np.add.at(f_M_r, inverse_idx, f_boot[r])
+        f_M_mapped_r = f_M_r[inverse_idx]
+        
+        w_r = np.where((m_valid > 1) & (f_M_mapped_r > 0), f_boot[r] * (omega_teorico / f_M_mapped_r), 0.0)
+        sum_w_r = np.sum(w_r)
+        
+        if sum_w_r > 0:
+            w_r = w_r / sum_w_r
+        else:
+            w_r = np.ones_like(w_r) / len(w_r)
+            
+        w_r[-1] = 1.0 - np.sum(w_r[:-1])
+        w_boot[r] = np.clip(w_r, 0.0, 1.0)
+
+    # Ahora sí: Le pasamos la matriz limpia de pesos a la función base
+    sims = _no_desde_pesos(w_boot)
 
     return float(no_muestra), float(no_poblacion), float(np.percentile(sims, 2.5)), float(np.percentile(sims, 97.5))

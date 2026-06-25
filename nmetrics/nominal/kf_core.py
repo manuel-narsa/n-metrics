@@ -95,33 +95,60 @@ def calcular_kf_poblacion_asintotica(matriz_entrada, k_escala=5, multiplicador=1
     return float(kf_pob_real)
 
 # ==============================================================================
-# 4. Cálculo del Coeficiente Muestral y su IC
+# 4. Cálculo del Coeficiente Muestral y su IC (Alineación Estricta PQStat Fleiss, 1971)
 # ==============================================================================
 def calcular_estadisticas_kf(matriz_entrada, S_replicas, k_escala=5):
+    """
+    Calcula Fleiss Kappa y su Intervalo de Confianza utilizando la 
+    Varianza Asintótica No-Nula exacta de Fleiss, Cohen & Everitt (1979).
+    Esta es la fórmula interna que utiliza PQStat y SPSS para los ICs.
+    """
     matriz_empirica = np.array(matriz_entrada, dtype=float)
-    n_sujetos, m_evaluadores = matriz_empirica.shape
+    n, m = matriz_empirica.shape
     
-    # 1. Cálculo puntual de KF para la matriz de muestra
-    X_muestra_3d = matriz_empirica[None, :, :]
-    kf_muestra = _compute_kf_vectorized_bc(X_muestra_3d, k_escala)[0]
+    # 1. Extracción topológica agnóstica
+    unique_vals = np.unique(matriz_empirica[~np.isnan(matriz_empirica)])
     
-    # 2. Motor de Caos: Bootstrap Clásico (Probabilidad 1/n)
-    indices = np.empty((S_replicas, n_sujetos), dtype=int)
-    for s in range(S_replicas):
-        indices[s] = np.random.choice(n_sujetos, size=n_sujetos, replace=True)
+    counts = np.zeros((n, len(unique_vals)))
+    for idx, val in enumerate(unique_vals):
+        counts[:, idx] = np.sum(matriz_empirica == val, axis=1)
         
-    X_3d_bc = matriz_empirica[indices]
+    # 2. Probabilidades Marginales Globales (p_j) y (q_j)
+    total_counts = np.sum(counts, axis=0)
+    pj = total_counts / (n * m)
+    qj = 1.0 - pj
     
-    # 3. Evaluación vectorizada de réplicas
-    kf_replicas = _compute_kf_vectorized_bc(X_3d_bc, k_escala)
+    # Acuerdo Esperado (Pe)
+    Pe = np.sum(pj ** 2)
     
-    # 4. Cálculo de los percentiles (IC)
-    clean_kf = kf_replicas[~np.isnan(kf_replicas)]
-    if len(clean_kf) > 0:
-        ic_inf, ic_sup = np.percentile(clean_kf, [2.5, 97.5])
-    else:
-        ic_inf, ic_sup = np.nan, np.nan
+    # 3. Acuerdo Observado (Po)
+    A_i = np.sum(counts * (counts - 1), axis=1) / (m * (m - 1))
+    Po = np.mean(A_i)
+    
+    # Protección matemática contra infinitos
+    if Pe == 1.0:
+        return {'KF Muestra': np.nan, 'IC Inf': np.nan, 'IC Sup': np.nan}
         
+    # 4. Fleiss Kappa Muestral
+    kf_muestra = (Po - Pe) / (1 - Pe)
+    
+    # 5. Varianza de Fleiss, Cohen & Everitt (1979)
+    # PQStat utiliza esta formulación algebraica en lugar del Método Delta lineal.
+    sum_pj_qj = np.sum(pj * qj)
+    
+    term_1 = sum_pj_qj ** 2
+    term_2 = np.sum(pj * qj * (qj - pj))
+    
+    var_k = (2.0 / (n * m * (m - 1))) * ((term_1 - term_2) / (sum_pj_qj ** 2))
+    ase = np.sqrt(max(0, var_k))
+    
+    # 6. Construcción del IC Clásico de PQStat (Z = 1.96)
+    ic_inf = kf_muestra - 1.96 * ase
+    ic_sup = kf_muestra + 1.96 * ase
+    
+    # Acotamiento superior
+    ic_sup = min(1.0, ic_sup)
+    
     return {
         'KF Muestra': kf_muestra,
         'IC Inf': ic_inf,

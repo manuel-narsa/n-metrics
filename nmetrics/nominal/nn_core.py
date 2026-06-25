@@ -212,27 +212,29 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # 1. NN MUESTRA
     # ---------------------------------------------------------
     w_muestra = f_t / n_total
+    
+    # RASTREO Y CORRECCIÓN DEL BUG DE FLOTANTES (np.random.choice)
+    w_muestra = w_muestra / np.sum(w_muestra)
+    w_muestra[-1] = 1.0 - np.sum(w_muestra[:-1])
+    w_muestra = np.clip(w_muestra, 0.0, 1.0)
+    
     nn_muestra = _nn_desde_pesos(w_muestra)[0]
 
     # ---------------------------------------------------------
     # 2. NN POBLACIÓN (Corrección Termodinámica Exacta)
     # ---------------------------------------------------------
     counts_rounded = np.round(counts, 4)
-    
-    # 🚀 CORRECCIÓN 1: ORDENAR PARA AGRUPAR EN LA "FIRMA" PURA
     counts_sorted = np.sort(counts_rounded, axis=1)[:, ::-1]
-    
     unique_counts, inverse_idx = np.unique(counts_sorted, axis=0, return_inverse=True)
     
     f_M = np.zeros(len(unique_counts))
     np.add.at(f_M, inverse_idx, f_t)
     f_M_mapped = f_M[inverse_idx]
 
-    # 🚀 CORRECCIÓN 2: MASA TERMODINÁMICA COMPLETA (Jueces + Categorías)
-    # A) Permutaciones de los Jueces (m! / c_i!)
+    # A) Permutaciones de los Jueces
     log_perm_jueces = gammaln(m_valid + 1) - np.sum(gammaln(counts + 1), axis=1)
     
-    # B) Permutaciones de las Categorías (k! / f_c!)
+    # B) Permutaciones de las Categorías
     f_c = np.zeros((U, m + 1))
     for c in range(m + 1):
         f_c[:, c] = np.sum(counts == c, axis=1)
@@ -242,15 +244,22 @@ def calcular_estadisticas_nn_unificada(dict_estados, k_escala, replicas=1000):
     # C) Multiplicidad Total
     log_omega = log_perm_jueces + log_asign_cat
     omega_teorico = np.exp(log_omega - np.max(log_omega))
-    # ---------------------------------------------------------
-
+    
     # Peso Poblacional SP
     w_pob = np.where((m_valid > 1) & (f_M_mapped > 0), f_t * (omega_teorico / f_M_mapped), 0.0)
     sum_wpob = np.sum(w_pob)
-    w_pob = w_pob / sum_wpob if sum_wpob > 0 else np.ones(U) / U
+    
+    if sum_wpob > 0:
+        w_pob = w_pob / sum_wpob
+    else:
+        w_pob = np.ones_like(w_pob) / len(w_pob) # Fallback
+        
+    # RASTREO Y CORRECCIÓN DEL BUG DE FLOTANTES (np.random.choice)
+    w_pob[-1] = 1.0 - np.sum(w_pob[:-1])
+    w_pob = np.clip(w_pob, 0.0, 1.0)
 
     nn_poblacion = _nn_desde_pesos(w_pob)[0]
-
+    
     # ---------------------------------------------------------
     # 3. IC SIMULACIÓN PONDERADA (Multinomial O(1))
     # ---------------------------------------------------------

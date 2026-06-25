@@ -115,7 +115,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                     resultados_inf.append({
                         "Métrica": "KF", "Muestra": st_kf['KF Muestra'], "Pob. Real": p_kf, 
                         "IC Inf": st_kf['IC Inf'], "IC Sup": st_kf['IC Sup'], 
-                        "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Bootstrap Clásico"
+                        "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Varianza No-Nula (Delta Method)"
                     })
                 except: pass
 
