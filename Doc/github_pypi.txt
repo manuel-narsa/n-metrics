@@ -1,0 +1,45 @@
+Revisa qué archivos has modificado:
+
+Bash
+	git status
+Prepara todos los cambios:
+
+Bash
+	git add .
+Crea el commit con un mensaje descriptivo:
+
+Bash
+	git commit -m "Corrige bug en X y añade función Y"
+Sube los cambios a tu repositorio remoto:
+
+Bash
+	git push origin main
+(Cambia main por master o el nombre de tu rama si es diferente).
+
+2. Actualizar tu paquete en PyPI
+Regla de oro: PyPI no te dejará sobreescribir una versión existente. Lo primero que debes hacer es subir el número de versión de tu proyecto.
+
+Actualiza la versión: Abre tu archivo setup.py, setup.cfg o pyproject.toml (según lo que uses) y cambia la versión (ej. pasa de 1.0.1 a 1.0.2).
+
+Limpia el historial de compilaciones (Recomendado):
+Borra las carpetas de versiones anteriores para no subir archivos viejos por accidente.
+
+Bash
+	rm -rf dist/ build/ *.egg-info
+(Si usas Windows PowerShell, usa Remove-Item -Recurse -Force dist, build, *.egg-info)
+
+Genera los nuevos archivos de distribución:
+Asegúrate de tener actualizada la herramienta de construcción (pip install --upgrade build) y ejecuta:
+
+Bash
+	python -m build
+(Nota: Si usas el método antiguo, el comando equivalente es python setup.py sdist bdist_wheel, pero python -m build es el estándar actual).
+
+Sube la nueva versión a PyPI:
+Usa twine (pip install --upgrade twine) para publicar los archivos generados en la carpeta dist:
+
+Bash
+	twine upload dist/*
+Te pedirá tus credenciales. Hoy en día, PyPI exige autenticación por token, por lo que el usuario será literalmente __token__ y la contraseña será tu token largo que empieza por pypi-.
+
+Tip de seguridad: Si has hecho cambios muy grandes y quieres asegurarte de que la instalación funciona bien antes de lanzarla al público, puedes subirla primero a la zona de pruebas usando twine upload --repository testpypi dist/*.

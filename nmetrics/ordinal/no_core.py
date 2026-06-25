@@ -296,19 +296,36 @@ def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
     
     # Calculamos la topología para todas las réplicas en bloque
     w_boot = np.zeros((replicas, U))
+# 4. Cálculo de pesos para cada réplica del Bootstrap
     for r in range(replicas):
+        # f_M_r es la distribución de frecuencias de los estados en la réplica 'r'
         f_M_r = np.zeros(len(unique_counts))
         np.add.at(f_M_r, inverse_idx, f_boot[r])
         f_M_mapped_r = f_M_r[inverse_idx]
         
-        w_r = np.where((m_valid > 1) & (f_M_mapped_r > 0), f_boot[r] * (omega_teorico / f_M_mapped_r), 0.0)
-        sum_w_r = np.sum(w_r)
+        # Máscara de validez: solo calculamos donde tenemos datos reales y omega es finito
+        validez_mask = (m_valid > 1) & (f_M_mapped_r > 0)
         
+        # Inicializamos pesos en 0.0 para que las posiciones inválidas no infesten el cálculo
+        w_r = np.zeros_like(f_boot[r], dtype=float)
+        
+        # Usamos np.divide con 'where' para evitar la división por cero y el RuntimeWarning
+        # Solo operamos en la máscara donde f_M_mapped_r es estrictamente > 0
+        w_r[validez_mask] = f_boot[r, validez_mask] * np.divide(
+            omega_teorico, 
+            f_M_mapped_r, 
+            out=np.zeros_like(f_M_mapped_r), 
+            where=f_M_mapped_r != 0
+        )[validez_mask]
+        
+        # Normalización robusta
+        sum_w_r = np.sum(w_r)
         if sum_w_r > 0:
             w_r = w_r / sum_w_r
         else:
             w_r = np.ones_like(w_r) / len(w_r)
             
+        # Corrección de punto flotante para asegurar suma 1.0 exacta
         w_r[-1] = 1.0 - np.sum(w_r[:-1])
         w_boot[r] = np.clip(w_r, 0.0, 1.0)
 
