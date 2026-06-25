@@ -4,4 +4,4 @@ numpy
 scipy
 plotly
 Pillow
-n-metrics==0.8.0
+n-metrics==0.8.1
