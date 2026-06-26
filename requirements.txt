@@ -5,7 +5,7 @@ scipy
 plotly
 Pillow
 <<<<<<< HEAD
-n-metrics==0.8.1
+n-metrics==0.8.2
 =======
 n-metrics==0.8.0
 >>>>>>> fce01fa8b6e0ff42801671bec3091c3fe0513f0f
