@@ -288,7 +288,7 @@ with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica y auditoría topológica de matrices empíricas.")
 
-opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza Topológica", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
+opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza Topológica", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autoría y Licencia"]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
 if pestaña_seleccionada != st.session_state["pestaña_activa"]:
