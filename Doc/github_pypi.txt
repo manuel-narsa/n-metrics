@@ -13,7 +13,7 @@ Bash
 Sube los cambios a tu repositorio remoto:
 
 Bash
-	git push origin main
+	git push -f origin main
 (Cambia main por master o el nombre de tu rama si es diferente).
 
 2. Actualizar tu paquete en PyPI
