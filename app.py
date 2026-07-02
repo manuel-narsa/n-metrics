@@ -288,7 +288,7 @@ with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica y auditoría topológica de matrices empíricas.")
 
-opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza Topológica", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
+opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza (n) y Sensibilidad (m)", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
 if pestaña_seleccionada != st.session_state["pestaña_activa"]:
@@ -690,84 +690,117 @@ elif st.session_state["pestaña_activa"] == '📈 Informe Multirrango':
             st.warning("No hay datos para esta combinación de parámetros.")
 
 # ==============================================================================
-# PESTAÑA 4: INVARIANZA TOPOLÓGICA
+# PESTAÑA 4: INVARIANZA TOPOLÓGICA (Bidimensional Optimizada)
 # ==============================================================================
-elif st.session_state["pestaña_activa"] == '🔄 Invarianza Topológica':
-    st.markdown("### Auditoría de Invarianza (Sensibilidad Muestral)")
+elif st.session_state["pestaña_activa"] == '🔄 Invarianza (n) y Sensibilidad (m)':
+    st.markdown("### Invarianza muestral (n) y Sensibilidad del panel (m)")
     if matriz_empirica is None or k_escala is None: 
         st.info("Sube una matriz y define k en el panel lateral.")
     else:
-        c1, c2 = st.columns([1, 2], vertical_alignment="bottom")
-        with c1: factor = st.number_input("Multiplicador (X veces):", 2, 100000, 10)
-        with c2: st.info(f"De **{n_sujetos}** a **{n_sujetos * factor}** sujetos.")
+        # Selector de Dirección Topológica
+        tipo_invarianza = st.radio(
+            "Selecciona la dimensión de escalado:", 
+            ["↕️ Vertical (Multiplicar Sujetos - n)", "↔️ Horizontal (Multiplicar Jueces - m)"], 
+            horizontal=True,
+            help="Vertical clona filas (evalúa la ley de los grandes números). Horizontal clona columnas (evalúa el comportamiento ante paneles masivos)."
+        )
         
-        if st.button("🔄 Ejecutar Test", type="primary"):
-            m_rep = np.tile(matriz_empirica, (factor, 1))
+        c1, c2 = st.columns([2, 1], vertical_alignment="bottom")
+        
+        with c1:
+            if "Vertical" in tipo_invarianza:
+                factor = st.number_input("Multiplicador (X veces):", 2, 100000, 2)
+                st.info(f"Escalando de **{n_sujetos}** a **{n_sujetos * factor}** sujetos (con $m={m_jueces}$).")
+                bloquear_test = False
+            else:
+                max_factor = int(50 // m_jueces)
+                if max_factor < 2:
+                    st.warning(f"⚠️ Tu matriz inicial ya tiene {m_jueces} jueces. No se puede multiplicar sin exceder el límite seguro de 50 evaluadores para los estimadores clásicos.")
+                    factor = 1
+                    bloquear_test = True
+                else:
+                    factor = st.number_input("Multiplicador (X veces):", 2, max_factor, 2, help="Límite máximo de 50 jueces en total para evitar colapsos en F-ANOVA/Bootstrap.")
+                    st.info(f"Escalando de **{m_jueces}** a **{m_jueces * factor}** jueces (con $n={n_sujetos}$).")
+                    bloquear_test = False
+
+        with c2: 
+            replicas_inv = st.number_input("Réplicas (Velocidad):", 10, 500, 50, help="Fija un S bajo (ej. 50) para que los clásicos no colapsen la memoria al escalar.")
+            
+        if st.button("🔄 Ejecutar Test Bidimensional", type="primary", disabled=bloquear_test):
+            
+            # Construcción matricial bidimensional
+            if "Vertical" in tipo_invarianza:
+                m_rep = np.tile(matriz_empirica, (factor, 1)) # Clona filas
+            else:
+                m_rep = np.tile(matriz_empirica, (1, factor)) # Clona columnas
+            
+            # Conversión a Macroestados
+            c_orig = Counter(tuple(x) for x in matriz_empirica)
+            c_rep = Counter(tuple(x) for x in m_rep)
+            
             res_inv = []
             
-            dict_original = Counter(tuple(x) for x in matriz_empirica)
-            dict_replicada = Counter(tuple(x) for x in m_rep)
-            
-            with st.spinner("Calculando huella topológica..."):
-                if "Intervalar" in topologia:
-                    try:
-                        v_ni_o = ni_core.calcular_estadisticas_ni_unificada(dict_original, k_escala, replicas)[0]
-                        v_ni_r = ni_core.calcular_estadisticas_ni_unificada(dict_replicada, k_escala, replicas)[0]
-                        res_inv.append({"Estimador": "N Interval (NI)", "Original": v_ni_o, "Replicada": v_ni_r, "Tipo": "N"})
-                    except Exception as e: st.error(f"Error Marco N: {e}")
-                    
-                    try:
-                        res_inv.append({"Estimador": "Alpha Krippendorff (AKI)", "Original": aki_core.calcular_estadisticas_aki(matriz_empirica, 10)['AKI Muestra'], "Replicada": aki_core.calcular_estadisticas_aki(m_rep, 10)['AKI Muestra'], "Tipo": "C"})
-                        res_inv.append({"Estimador": "ICC(2,1)", "Original": icc21_core.calcular_estadisticas_icc21(matriz_empirica)['ICC Muestra'], "Replicada": icc21_core.calcular_estadisticas_icc21(m_rep)['ICC Muestra'], "Tipo": "C"})
-                    except: pass
-                    
-                elif "Nominal" in topologia:
-                    try:
-                        v_nn_o = nn_core.calcular_estadisticas_nn_unificada(dict_original, k_escala, replicas)[0]
-                        v_nn_r = nn_core.calcular_estadisticas_nn_unificada(dict_replicada, k_escala, replicas)[0]
-                        res_inv.append({"Estimador": "N Nominal (NN)", "Original": v_nn_o, "Replicada": v_nn_r, "Tipo": "N"})
-                    except Exception as e: st.error(f"Error Marco N: {e}")
-                    
-                    try:
-                        res_inv.append({"Estimador": "Alpha Krippendorff (AKN)", "Original": akn_core.calcular_estadisticas_akn(matriz_empirica, 10, k_escala)['AKN Muestra'], "Replicada": akn_core.calcular_estadisticas_akn(m_rep, 10, k_escala)['AKN Muestra'], "Tipo": "C"})
-                        res_inv.append({"Estimador": "Kappa Fleiss (KF)", "Original": kf_core.calcular_estadisticas_kf(matriz_empirica, 10, k_escala)['KF Muestra'], "Replicada": kf_core.calcular_estadisticas_kf(m_rep, 10, k_escala)['KF Muestra'], "Tipo": "C"})
-                    except: pass
-                    
-                else: 
-                    try:
-                        v_no_o = no_core.calcular_estadisticas_no_unificada(dict_original, k_escala, replicas)[0]
-                        v_no_r = no_core.calcular_estadisticas_no_unificada(dict_replicada, k_escala, replicas)[0]
-                        res_inv.append({"Estimador": "N Ordinal (NO)", "Original": v_no_o, "Replicada": v_no_r, "Tipo": "N"})
-                    except Exception as e: st.error(f"Error Marco N: {e}")
-                    
-                    try:
-                        res_inv.append({"Estimador": "Alpha Krippendorff (AKO)", "Original": ako_core.calcular_estadisticas_ako(matriz_empirica, 10, k_escala)['AKO Muestra'], "Replicada": ako_core.calcular_estadisticas_ako(m_rep, 10, k_escala)['AKO Muestra'], "Tipo": "C"})
-                        res_inv.append({"Estimador": "Kendall W", "Original": w_core.calcular_estadisticas_w(matriz_empirica, 10, k_escala)['W Muestra'], "Replicada": w_core.calcular_estadisticas_w(m_rep, 10, k_escala)['W Muestra'], "Tipo": "C"})
-                    except: pass
-
-            df_inv = pd.DataFrame(res_inv)
-            if not df_inv.empty:
-                df_inv["Variación"] = df_inv["Replicada"] - df_inv["Original"]
+            with st.spinner(f"Calculando huella topológica ({'Vertical' if 'Vertical' in tipo_invarianza else 'Horizontal'})..."):
                 
-                def style_inv(r):
-                    try: 
-                        return ['color: #28a745; font-weight: bold;' if abs(float(r['Variación'])) < 1e-6 else 'color: #dc3545; font-weight: bold; background-color: #ffe6e6;']*len(r)
-                    except: 
-                        return ['']*len(r)
-                        
-                st.dataframe(df_inv.drop(columns=["Tipo"]).style.format({"Original": "{:.4f}", "Replicada": "{:.4f}", "Variación": "{:+.4f}"}).apply(style_inv, axis=1), width="stretch")
+                # Función extractora proactiva
+                def extr(func, *args):
+                    res = func(*args)
+                    if isinstance(res, dict): 
+                        val = res.get('Muestra', res.get('AKI Muestra', res.get('ICC Muestra', res.get('AKN Muestra', res.get('KF Muestra', res.get('AKO Muestra', res.get('W Muestra', 0)))))))
+                        inf, sup = res.get('IC Inf', 0), res.get('IC Sup', 0)
+                    else: 
+                        val, inf, sup = res[0], res[2], res[3]
+                    return val, inf, sup, (sup - inf)
+
+                # Gestor de evaluación segura
+                def add_res(nom, func, arg_o, arg_r, *extra):
+                    try:
+                        v_o, i_o, s_o, a_o = extr(func, arg_o, *extra)
+                        v_r, i_r, s_r, a_r = extr(func, arg_r, *extra)
+                        res_inv.append({
+                            "Estimador": nom, 
+                            "Orig": v_o, "IC O": f"[{i_o:.3f}, {s_o:.3f}]", "Ancho O": a_o, 
+                            "Repl": v_r, "IC R": f"[{i_r:.3f}, {s_r:.3f}]", "Ancho R": a_r
+                        })
+                    except Exception as e:
+                        st.error(f"Error procesando {nom}: {e}")
+
+                # Enrutamiento Termodinámico
+                if "Intervalar" in topologia:
+                    add_res("N-Interval (NI)", ni_core.calcular_estadisticas_ni_unificada, c_orig, c_rep, k_escala, replicas_inv)
+                    add_res("Alpha Krippendorff", aki_core.calcular_estadisticas_aki, matriz_empirica, m_rep, replicas_inv)
+                    add_res("ICC(2,1)", icc21_core.calcular_estadisticas_icc21, matriz_empirica, m_rep)
+                
+                elif "Nominal" in topologia:
+                    add_res("N-Nominal (NN)", nn_core.calcular_estadisticas_nn_unificada, c_orig, c_rep, k_escala, replicas_inv)
+                    add_res("AKN", akn_core.calcular_estadisticas_akn, matriz_empirica, m_rep, replicas_inv)
+                    add_res("Kappa Fleiss", kf_core.calcular_estadisticas_kf, matriz_empirica, m_rep, replicas_inv)
+                
+                else: # Ordinal
+                    add_res("N-Ordinal (NO)", no_core.calcular_estadisticas_no_unificada, c_orig, c_rep, k_escala, replicas_inv)
+                    add_res("AKO", ako_core.calcular_estadisticas_ako, matriz_empirica, m_rep, replicas_inv)
+                    add_res("Kendall W", w_core.calcular_estadisticas_w, matriz_empirica, m_rep, replicas_inv)
+
+            # Tablas y Métricas
+            if res_inv:
+                df_inv = pd.DataFrame(res_inv)
+                df_inv["Var"] = df_inv["Repl"] - df_inv["Orig"]
+                
+                st.dataframe(df_inv.style.format({
+                    "Orig": "{:.4f}", "Repl": "{:.4f}", 
+                    "Ancho O": "{:.4f}", "Ancho R": "{:.4f}", 
+                    "Var": "{:+.4f}"
+                }), width="stretch")
                 
                 st.markdown("### Resumen Ejecutivo: Estabilidad Estructural")
-                cols_inv = st.columns(len(df_inv))
+                cols = st.columns(len(df_inv))
                 for i, row in df_inv.iterrows():
-                    est = row["Estimador"]
-                    rep = row["Replicada"]
-                    dif = row["Variación"]
-                    
-                    if abs(dif) < 1e-6: 
-                        cols_inv[i].metric(label=f"{est}", value=f"{rep:.4f}", delta="Invariante (0.0000)", delta_color="normal")
-                    else: 
-                        cols_inv[i].metric(label=f"{est}", value=f"{rep:.4f}", delta=f"Inconsistente ({dif:+.4f})", delta_color="inverse")
+                    cols[i].metric(
+                        label=row["Estimador"], 
+                        value=f"{row['Repl']:.4f}", 
+                        delta=f"Var: {row['Var']:.4f}", 
+                        help=f"Ancho IC Original: {row['Ancho O']:.4f} ➔ Ancho IC Replicado: {row['Ancho R']:.4f}"
+                    )
 
 # ==============================================================================
 # PESTAÑA 5: GENERADOR DE MATRICES EXPERIMENTALES (SINTÉTICAS)

@@ -5,24 +5,17 @@ from math import comb
 # ==============================================================================
 # REEMPLAZO EN w_core.py: KENDALL'S W INMUNE A VALORES ABSOLUTOS
 # ==============================================================================
+# ==============================================================================
+# REEMPLAZO EN w_core.py: KENDALL'S W OPTIMIZADO (RESISTENTE A BIG DATA)
+# ==============================================================================
 def _compute_w_vectorized(X_3d):
     """
-    Cálculo vectorizado de Kendall's W (Coeficiente de Concordancia Ordinal)
-    optimizado con extracción topológica de empates.
+    Cálculo de Kendall's W (Coeficiente de Concordancia Ordinal).
+    Optimizado en O(n log n) para evitar explosión de RAM en tensores 4D.
     """
     S, n, m = X_3d.shape
     
-    # Rango por pares (Esto ya era inmune a las etiquetas)
-    diff = X_3d[:, :, None, :] - X_3d[:, None, :, :] 
-    less = (diff < 0).astype(float)
-    equal = (diff == 0).astype(float)
-    
-    ranks = np.sum(less + 0.5 * equal, axis=2) + 0.5 
-    R_i = np.sum(ranks, axis=2) 
-    mean_R = m * (n + 1) / 2.0
-    S_val = np.sum((R_i - mean_R)**2, axis=1) 
-    
-    # NUEVO: Corrección de empates topológica (Sin crear k matrices en memoria)
+    # 1. Corrección de empates topológica (Vectorizada y ligera)
     unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
     k_real = len(unique_vals)
     counts = np.zeros((S, m, k_real))
@@ -35,6 +28,20 @@ def _compute_w_vectorized(X_3d):
     
     denom = (m**2) * (n**3 - n) - m * T_total
     
+    # 2. Suma de Rangos (S_val) sin tensores masivos
+    S_val = np.zeros(S)
+    mean_R = m * (n + 1) / 2.0
+    
+    # Iteramos sobre las réplicas para mantener la huella de memoria en O(n*m)
+    for s in range(S):
+        X_s = X_3d[s] # Matriz 2D (Sujetos x Jueces)
+        
+        # DataFrame.rank(method='average') es extremadamente rápido para rangos ordinales fraccionales
+        ranks = pd.DataFrame(X_s).rank(method='average').values
+        
+        R_i = np.sum(ranks, axis=1)
+        S_val[s] = np.sum((R_i - mean_R)**2)
+        
     with np.errstate(divide='ignore', invalid='ignore'):
         W = np.where(denom == 0, np.nan, 12.0 * S_val / denom)
         
