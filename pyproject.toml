@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "n-metrics"
-version = "0.8.2"
+version = "0.8.3"
 authors = [
   { name="Manuel Narbona Sarria", email="manuel.narsa@gmail.com" },
 ]
@@ -71,3 +71,10 @@ nmetrics-ordinal-comp  = "nmetrics.cli.ordinal.comparativa_ordinal:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nmetrics*"]
+exclude = [
+    "H", 
+    "H.*", 
+    "*.H", 
+    "*.H.*",
+    "nmetrics-web/*"
+]

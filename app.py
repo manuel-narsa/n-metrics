@@ -41,7 +41,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
             resultados_inf.append({
                 "Métrica": "NI", "Muestra": ni_muestra, "Pob. Real": pob_real, 
                 "IC Inf": inf, "IC Sup": sup, "Ancho IC": sup - inf,
-                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Termodinámica Condensada (SP)"
+                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Simulación Ponderada"
             })
         except Exception as e: st.warning(f"⚠️ El motor NI falló: {e}")
 
@@ -54,13 +54,14 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
             resultados_inf.append({
                 "Métrica": "NN", "Muestra": nn_muestra, "Pob. Real": pob_real, 
                 "IC Inf": inf, "IC Sup": sup, "Ancho IC": sup - inf,
-                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Termodinámica Condensada (SP)"
+                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Simulación Ponderada"
             })
         except Exception as e: st.warning(f"⚠️ El motor NN falló: {e}")
 
     # --- C. MOTOR UNIFICADO: NO (Ordinal) ---
     elif "Ordinal" in topologia and "NO (Marco N)" in estimadores:
         try:
+            #print(f"Shape: {matriz_np.shape}, Min: {matriz_np.min()}, Max: {matriz_np.max()}")
             no_muestra, pob_real, inf, sup = no_core.calcular_estadisticas_no_unificada(dict_estados, k_calc, replicas)
             
             # 🚀 CORRECCIÓN DEFINITIVA: Desempaquetado usando tu función unificada real
@@ -69,7 +70,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
             resultados_inf.append({
                 "Métrica": "NO", "Muestra": no_muestra, "Pob. Real": pob_real, 
                 "IC Inf": inf, "IC Sup": sup, "Ancho IC": sup - inf,
-                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Límite Asintótico Central"
+                "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Simulación Ponderada"
             })
         except Exception as e: st.warning(f"⚠️ El motor NO falló: {e}")
 
@@ -115,7 +116,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                     resultados_inf.append({
                         "Métrica": "KF", "Muestra": st_kf['KF Muestra'], "Pob. Real": p_kf, 
                         "IC Inf": st_kf['IC Inf'], "IC Sup": st_kf['IC Sup'], 
-                        "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Bootstrap Clásico"
+                        "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Varianza asintótica (Fleiss, 2003)"
                     })
                 except: pass
 
@@ -288,7 +289,7 @@ with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica y auditoría topológica de matrices empíricas.")
 
-opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza (n) y Sensibilidad (m)", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
+opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza (n) y Sensibilidad (m)", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autoría y Licencia"] #"📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
 if pestaña_seleccionada != st.session_state["pestaña_activa"]:
@@ -1008,6 +1009,23 @@ elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     
+    # --- BLOQUEO POR REVISIÓN ANÓNIMA POR PARES ---
+    #st.warning(
+    #    "🔒 **Material Multimedia y Documentación Desactivados**\n\n"
+    #    "Para garantizar el rigor y la estricta integridad del proceso de **revisión anónima por pares** "
+    #    "(Double-Blind Peer Review), los vídeos explicativos de la plataforma y la descarga del "
+    #    "manuscrito original en PDF han sido temporalmente ocultados, ya que dicho material contiene "
+    #    "información que revelaría la identidad de la autoría. Todo el material será restaurado de "
+    #    "forma pública una vez finalizado el proceso editorial.",
+    #    icon="🕵️‍♂️"
+    #)
+    
+    st.write("") # Espacio para dar respiro visual
+    
+    # --------------------------------------------------------------------------
+    # CÓDIGO ORIGINAL OCULTO (Para restaurar tras publicación del artículo)
+    # Selecciona este bloque en tu editor y pulsa Ctrl + } o Cmd + / para descomentar
+    # --------------------------------------------------------------------------
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
         st.video("https://youtu.be/XSpIfelUrZU")
@@ -1039,6 +1057,9 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
         
     with col2:
         st.video("https://youtu.be/f0LMSS5LEho")
+    # --------------------------------------------------------------------------
+    
+    # --- AQUÍ CONTINÚA EL RESTO DE TU PESTAÑA (Texto, teoría, etc.) ---
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
@@ -1181,7 +1202,7 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
     st.markdown("### 🎓 Cómo citar este trabajo")
     st.write("Si utilizas N-Metrics o el Marco Termodinámico N en tu investigación, por favor cita el manuscrito original:")
     
-    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Zenodo. https://doi.org/10.5281/zenodo.20547816")
+    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Zenodo. https://doi.org/10.5281/zenodo.21382589")
     
     with st.expander("Ver formato BibTeX para LaTeX"):
         st.code("""@article{narbona_n_coefficient,
@@ -1189,5 +1210,5 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
   author={Narbona Sarria, Manuel},
   journal={Preprint},
   year={2026},
-  url={https://doi.org/10.5281/zenodo.20589453}
+  url={https://doi.org/10.5281/zenodo.21382589}
 }""", language="bibtex")

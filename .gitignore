@@ -7,8 +7,12 @@ build/
 .ipynb_checkpoints/
 *.csv
 *.tex
+*.txt
 *.ps1
 *.zip
 */*/H/
 */H/
 nmetrics-web/
+nmetrics-notebook.ipynb
+Doc/github_pypi.txt
+.gitignore
