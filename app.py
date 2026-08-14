@@ -86,7 +86,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_aki['IC Inf'], "IC Sup": st_aki['IC Sup'], 
                         "Ancho IC": st_aki['IC Sup'] - st_aki['IC Inf'], "Motor": "Bootstrap Clásico"
                     })
-                except: pass
+                #except: pass
+                except Exception as e: 
+                    st.warning(f"Error en AKI: {e}")
             if "ICC(2,1) (F-ANOVA)" in estimadores:
                 try:
                     p_icc = icc21_core.calcular_icc_poblacion_asintotica(matriz_np, 1, k_calc, 100)
@@ -96,7 +98,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_icc['IC Inf'], "IC Sup": st_icc['IC Sup'], 
                         "Ancho IC": st_icc['IC Sup'] - st_icc['IC Inf'], "Motor": "F-ANOVA"
                     })
-                except: pass    
+                #except: pass    
+                except Exception as e: 
+                    st.warning(f"Error en ICC(2,1): {e}")
 
         if "Nominal" in topologia:
             if "AKN (Bootstrap C.)" in estimadores:
@@ -108,7 +112,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_akn['IC Inf'], "IC Sup": st_akn['IC Sup'], 
                         "Ancho IC": st_akn['IC Sup'] - st_akn['IC Inf'], "Motor": "Bootstrap Clásico"
                     })
-                except: pass
+                #except: pass
+                except Exception as e: 
+                    st.warning(f"Error en AKN: {e}")
             if "Kappa Fleiss (Bootstrap C.)" in estimadores:
                 try:
                     p_kf = kf_core.calcular_kf_poblacion_asintotica(matriz_np, k_calc, 100)
@@ -118,7 +124,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_kf['IC Inf'], "IC Sup": st_kf['IC Sup'], 
                         "Ancho IC": st_kf['IC Sup'] - st_kf['IC Inf'], "Motor": "Varianza asintótica (Fleiss, 2003)"
                     })
-                except: pass
+                #except: pass
+                except Exception as e: 
+                    st.warning(f"Error en KF: {e}")
 
         if "Ordinal" in topologia:
             if "AKO (Bootstrap C.)" in estimadores:
@@ -130,7 +138,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_ako['IC Inf'], "IC Sup": st_ako['IC Sup'], 
                         "Ancho IC": st_ako['IC Sup'] - st_ako['IC Inf'], "Motor": "Bootstrap Clásico"
                     })
-                except: pass
+                #except: pass
+                except Exception as e: 
+                    st.warning(f"Error en AKO: {e}")
             if "Kendall W (Bootstrap C.)" in estimadores:
                 try:
                     p_w = w_core.calcular_w_poblacion_asintotica(matriz_np, k_calc, 100)
@@ -140,7 +150,9 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
                         "IC Inf": st_w['IC Inf'], "IC Sup": st_w['IC Sup'], 
                         "Ancho IC": st_w['IC Sup'] - st_w['IC Inf'], "Motor": "Bootstrap Clásico"
                     })
-                except: pass
+                #except: pass
+                except Exception as e: 
+                    st.warning(f"Error en W: {e}")
 
     return resultados_inf
 
@@ -287,7 +299,7 @@ with col_logo:
     except: pass
 with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
-st.markdown("Plataforma oficial para la inferencia termodinámica y auditoría topológica de matrices empíricas.")
+st.markdown("Plataforma oficial para la inferencia termodinámica, auditoría topológica y procesamiento a escala de Big Data de matrices empíricas.")
 
 opciones_pestañas = ["📊 Cálculo del Consenso", "🎯 Pruebas de Cobertura", "📈 Informe Multirrango", "🔄 Invarianza (n) y Sensibilidad (m)", "🏗️ Generador de Matrices", "⚔️ Duelo: N vs Clásicos", "📖 Manual de Usuario", "📜 Autoría y Licencia"] #"📜 Autor -Ocultado para facilitar la revisón anonima por pares- y Licencia"]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
@@ -302,7 +314,7 @@ st.markdown("---")
 # ==============================================================================
 if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
     if matriz_original is not None:
-        st.success(f"🚀 Análisis Activo: Procesando {n_sujetos:,} registros.")
+        st.success(f"🚀 Análisis Activo: Procesando {n_sujetos:,} registros con {m_jueces} jueces y escala {k_escala}.")
         with st.expander("👁️ Ver Matriz", expanded=False):
             df_vis = pd.DataFrame(matriz_original, columns=[f"J{j+1:03d}" for j in range(m_jueces)], index=[f"S{i+1:03d}" for i in range(n_sujetos)])
             st.dataframe(df_vis, width="stretch")
@@ -813,7 +825,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
     g_col1, g_col2, g_col3 = st.columns(3)
     with g_col1: gen_k = st.number_input("Escala (k)", 2, 20, 5, key="gk")
     with g_col2: gen_m = st.number_input("Jueces (m)", 2, 50, 7, key="gm")
-    with g_col3: gen_n = st.number_input("Sujetos (n)", 1, 50000, 15, key="gn")
+    with g_col3: gen_n = st.number_input("Sujetos (n)", 1, 5000000, 15, key="gn")
 
     g_col4, g_col5 = st.columns(2)
     with g_col4: gen_faltantes = st.slider("Faltantes (%)", 0.0, 100.0, 0.0, 5.0) / 100
@@ -823,9 +835,9 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
     if "df_base_1" not in st.session_state or st.session_state.get("gk_last_base1") != gen_k:
         st.session_state["df_base_1"] = pd.DataFrame(np.full((1, gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=["Prob (%)"])
         st.session_state["gk_last_base1"] = gen_k
-    edit_base_1 = st.data_editor(st.session_state["df_base_1"], width="stretch", key="edit_base_1")
+    edit_base_1 = st.data_editor(st.session_state["df_base_1"], width='stretch', key="edit_base_1")
 
-    modo = st.radio("", ["Patrón global", "Patrón por sujeto"], horizontal=True)
+    modo = st.radio("Selecciona el modo de patrón:", ["Patrón global", "Patrón por sujeto"], horizontal=True, label_visibility="collapsed")
     
     edit_n_rows = None
     if modo == "Patrón por sujeto":
@@ -833,7 +845,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
         if st.session_state.get("last_state_key") != (gen_n, gen_k, base_hash):
             st.session_state["df_n_rows"] = pd.DataFrame(np.tile(edit_base_1.values, (gen_n, 1)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=[f"S{i+1}" for i in range(gen_n)])
             st.session_state["last_state_key"] = (gen_n, gen_k, base_hash)
-        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], width="stretch")
+        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], width='stretch')
 
     st.markdown("#### Excepciones (Agujeros Negros)")
     excepciones = st.multiselect("Selecciona sujetos para inyectar anomalías:", [f"S{i+1}" for i in range(gen_n)])
@@ -843,43 +855,71 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
             st.session_state["df_exc"] = pd.DataFrame(np.full((len(excepciones), gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=excepciones)
             st.session_state["exc_last"] = excepciones
             st.session_state["exc_last_k"] = gen_k
-        edit_exc = st.data_editor(st.session_state["df_exc"],width="stretch")
+        edit_exc = st.data_editor(st.session_state["df_exc"], width='stretch')
 
     def crear_matriz_sintetica():
-        matriz = []
         base_p = edit_base_1.iloc[0].values
+        p_norm = base_p / base_p.sum() if base_p.sum() > 0 else np.ones(gen_k) / gen_k
         
+        # CASO 1: Optimización masiva vectorial si es Patrón Global sin excepciones
+        if modo == "Patrón global" and not excepciones:
+            matriz = np.random.choice(
+                np.arange(1, gen_k + 1, dtype=float), 
+                size=(gen_n, gen_m), 
+                p=p_norm
+            )
+            
+            if gen_decimales > 0:
+                ruido = np.random.uniform(-0.1, 0.1, size=(gen_n, gen_m))
+                matriz = np.clip(matriz + ruido, 1.0, float(gen_k))
+                matriz = np.round(matriz, gen_decimales)
+                
+            if gen_faltantes > 0:
+                mascara_nan = np.random.rand(gen_n, gen_m) < gen_faltantes
+                matriz[mascara_nan] = np.nan
+                
+            return pd.DataFrame(matriz, columns=[f"J{i+1}" for i in range(gen_m)])
+
+        # CASO 2: Modo por sujeto o con excepciones (Versión híbrida optimizada)
+        matriz = np.empty((gen_n, gen_m), dtype=float)
+        
+        exc_dict = {}
+        if edit_exc is not None and excepciones:
+            exc_dict = {s_id: edit_exc.loc[s_id].values for s_id in excepciones}
+            
+        n_rows_values = edit_n_rows.values if (modo == "Patrón por sujeto" and edit_n_rows is not None) else None
+
         for i in range(gen_n):
             sujeto_id = f"S{i+1}"
-            if edit_exc is not None and sujeto_id in excepciones:
-                p = edit_exc.loc[sujeto_id].values
-            elif modo == "Patrón por sujeto" and edit_n_rows is not None:
-                p = edit_n_rows.loc[sujeto_id].values
+            if sujeto_id in exc_dict:
+                p = exc_dict[sujeto_id]
+            elif n_rows_values is not None:
+                p = n_rows_values[i]
             else:
                 p = base_p
             
-            p_norm = p / p.sum() if p.sum() > 0 else np.ones(gen_k)/gen_k
-            fila = np.random.choice(range(1, gen_k+1), size=gen_m, p=p_norm).astype(float)
-            
-            if gen_decimales > 0:
-                fila += np.random.uniform(-0.1, 0.1, gen_m)
-                fila = np.clip(fila, 1.0, float(gen_k))
-                fila = np.round(fila, gen_decimales)
-            if gen_faltantes > 0:
-                fila[np.random.rand(gen_m) < gen_faltantes] = np.nan
-            matriz.append(fila)
+            p_n = p / p.sum() if p.sum() > 0 else np.ones(gen_k)/gen_k
+            matriz[i] = np.random.choice(np.arange(1, gen_k + 1, dtype=float), size=gen_m, p=p_n)
+
+        if gen_decimales > 0:
+            matriz = np.clip(matriz + np.random.uniform(-0.1, 0.1, size=(gen_n, gen_m)), 1.0, float(gen_k))
+            matriz = np.round(matriz, gen_decimales)
+        if gen_faltantes > 0:
+            matriz[np.random.rand(gen_n, gen_m) < gen_faltantes] = np.nan
+
         return pd.DataFrame(matriz, columns=[f"J{i+1}" for i in range(gen_m)])
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        if st.button("Preparar Descarga", width="stretch"):
+        if st.button("Preparar Descarga", width='stretch'):
             st.session_state['matriz_csv_temp'] = crear_matriz_sintetica()
+        
         if 'matriz_csv_temp' in st.session_state:
             csv = st.session_state['matriz_csv_temp'].to_csv(index=False)
-            st.download_button("Descargar CSV", csv, "matriz_sintetica.csv", "text/csv", width="stretch")
+            st.download_button("Descargar CSV", csv, "matriz_sintetica.csv", "text/csv", width='stretch')
 
     with col_b2:
-        if st.button("🚀 Generar y Cargar en la App", type="primary", width="stretch"):
+        if st.button("🚀 Generar y Cargar en la App", type="primary", width='stretch'):
             with st.spinner("Sintetizando..."):
                 df_sintetico = crear_matriz_sintetica()
                 import io
@@ -887,6 +927,9 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
                 df_sintetico.to_csv(buffer, index=False, header=False)
                 buffer.seek(0)
                 conteo_est, n_tot = cargar_y_agregar_dataset(buffer, sep=",")
+                
+                # Limpieza de resultados previos
+                st.session_state.pop('res_inferencia', None)
                 
                 st.session_state.update({
                     'usar_sintetica': True, 
@@ -1028,7 +1071,20 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     # --------------------------------------------------------------------------
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        st.video("https://youtu.be/XSpIfelUrZU")
+        st.video("https://youtu.be/mHQekxmCxH4")
+        # playlist_url = "https://www.youtube.com/playlist?list=PLALhLr0IGT-Y"
+        # video_url = "https://youtu.be/mHQekxmCxH4"
+
+        # st.markdown(
+        #     f"""
+        #     <a href="{playlist_url}" target="_blank">
+        #         <img src="https://img.youtube.com/vi/mHQekxmCxH4/0.jpg" 
+        #              style="width:100%; border-radius:10px;">
+        #     </a>
+        #     """,
+        #     unsafe_allow_html=True
+        # )
+
         
     with col3:
         st.write(""); st.write(""); st.write(""); st.write("")
@@ -1056,7 +1112,7 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
         st.markdown("</div>", unsafe_allow_html=True)
         
     with col2:
-        st.video("https://youtu.be/f0LMSS5LEho")
+        st.video("https://youtu.be/BjfPvSKJeXA")
     # --------------------------------------------------------------------------
     
     # --- AQUÍ CONTINÚA EL RESTO DE TU PESTAÑA (Texto, teoría, etc.) ---
@@ -1196,13 +1252,14 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
         
     st.markdown("---")
     st.markdown("### Licencia de Uso")
-    st.write("**Licencia Abierta**. GNU GPLv3. Se concede plena libertad para utilizar, estudiar, modificar y distribuir este código fuente, bajo la estricta condición de que cualquier obra derivada se publique obligatoriamente bajo estos mismos términos, garantizando el acceso abierto al resto de la comunidad.")
+    st.write("**Licencia Abierta**. GNU GPLv3.")
     
     st.markdown("---")
     st.markdown("### 🎓 Cómo citar este trabajo")
     st.write("Si utilizas N-Metrics o el Marco Termodinámico N en tu investigación, por favor cita el manuscrito original:")
     
-    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Zenodo. https://doi.org/10.5281/zenodo.21382589")
+    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Available at Zenodo: https://doi.org/10.5281/zenodo.20075068")
+    st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Available at SSRN: https://ssrn.com/abstract=7119419 or http://dx.doi.org/10.2139/ssrn.7119419")
     
     with st.expander("Ver formato BibTeX para LaTeX"):
         st.code("""@article{narbona_n_coefficient,
@@ -1210,5 +1267,6 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
   author={Narbona Sarria, Manuel},
   journal={Preprint},
   year={2026},
-  url={https://doi.org/10.5281/zenodo.21382589}
+  url={https://doi.org/10.5281/zenodo.20075068}
+  url={http://dx.doi.org/10.2139/ssrn.7119419}
 }""", language="bibtex")

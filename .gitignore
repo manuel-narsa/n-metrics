@@ -1,9 +1,24 @@
+# Bases de datos y caché
+*.db
+*.zip
+
+# Entorno local y claves
+.env
 .venv/
+
+# Compilaciones de Python y PyPI
+build/
+dist/
+*.egg-info/
 __pycache__/
 *.pyc
-dist/
-build/
-*.egg-info/
+
+# Archivos de prueba y temporales
+*.ipynb
+*.wav
+N.pdf
+app - copia*.py
+app - *.py
 .ipynb_checkpoints/
 *.csv
 *.tex
@@ -15,4 +30,5 @@ build/
 nmetrics-web/
 nmetrics-notebook.ipynb
 Doc/github_pypi.txt
-.gitignore
+nmetrics-notebook.ipynb
+

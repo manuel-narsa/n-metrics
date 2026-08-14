@@ -52,9 +52,9 @@ def calcular_parametros_poblacion_fraccionaria(matriz_entrada, k_min=1, k_max=5)
     return pd.DataFrame(filas_salida, columns=columnas), cols_x
 
 # ==============================================================================
-# 2. Cálculo Teórico Poblacional (Matriz Asintótica)
+# 2. Cálculo Teórico Poblacional (Matriz Asintótica con N_pop Adaptativo)
 # ==============================================================================
-def calcular_icc_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multiplicador=1000):
+def calcular_icc_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multiplicador=None):
     df_pob, cols_x = calcular_parametros_poblacion_fraccionaria(matriz_entrada, k_min, k_max)
     pesos = df_pob['Num_Tuplas'].values.astype(float)
     
@@ -64,13 +64,25 @@ def calcular_icc_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multipli
         
     prob = pesos / sum_pesos
     n, k = matriz_entrada.shape
-    N_pop = n * multiplicador
+    
+    # --- 1. ESCALADO ADAPTATIVO DE POBLACIÓN OBJETIVO ---
+    if multiplicador is None:
+        # Mantiene la población entre 100.000 y 500.000 filas
+        N_pop = int(np.clip(n * 1000, 100_000, 500_000))
+    else:
+        N_pop = int(n * multiplicador)
     
     counts = np.round(prob * N_pop).astype(int)
     
+    # Ajuste de diferencias por redondeo
     diff = N_pop - np.sum(counts)
-    if diff > 0: counts[np.argmax(prob)] += diff
-    elif diff < 0: counts[np.argmax(counts)] += diff
+    if diff > 0: 
+        counts[np.argmax(prob)] += diff
+    elif diff < 0: 
+        counts[np.argmax(counts)] += diff
+        
+    # --- 2. SANITIZACIÓN CRÍTICA CONTRA VALORES NEGATIVOS ---
+    counts = np.maximum(0, counts).astype(int)
         
     X_massive = np.repeat(matriz_entrada, counts, axis=0)
     stats_pop = calcular_estadisticas_icc21(X_massive)

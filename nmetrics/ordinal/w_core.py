@@ -8,37 +8,38 @@ from math import comb
 # ==============================================================================
 # REEMPLAZO EN w_core.py: KENDALL'S W OPTIMIZADO (RESISTENTE A BIG DATA)
 # ==============================================================================
-def _compute_w_vectorized(X_3d):
+# ==============================================================================
+# REEMPLAZO EN w_core.py: KENDALL'S W CON OPCIÓN DE CORRECCIÓN DE EMPATES
+# ==============================================================================
+def _compute_w_vectorized(X_3d, ajustar_empates=True):
     """
-    Cálculo de Kendall's W (Coeficiente de Concordancia Ordinal).
-    Optimizado en O(n log n) para evitar explosión de RAM en tensores 4D.
+    Cálculo de Kendall's W.
+    - ajustar_empates=True:  Fórmula exacta de Kendall (1970) / Siegel (0.1436).
+    - ajustar_empates=False: Fórmula clásica sin corregir empates / PQStat (0.1379).
     """
     S, n, m = X_3d.shape
     
-    # 1. Corrección de empates topológica (Vectorizada y ligera)
-    unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
-    k_real = len(unique_vals)
-    counts = np.zeros((S, m, k_real))
-    
-    for idx, val in enumerate(unique_vals):
-        counts[:, :, idx] = np.sum(X_3d == val, axis=1)
+    if ajustar_empates:
+        unique_vals = np.unique(X_3d[~np.isnan(X_3d)])
+        k_real = len(unique_vals)
+        counts = np.zeros((S, m, k_real))
         
-    T_j = np.sum(counts**3 - counts, axis=2) 
-    T_total = np.sum(T_j, axis=1) 
+        for idx, val in enumerate(unique_vals):
+            counts[:, :, idx] = np.sum(X_3d == val, axis=1)
+            
+        T_j = np.sum(counts**3 - counts, axis=2)
+        T_total = np.sum(T_j, axis=1)
+        denom = (m**2) * (n**3 - n) - m * T_total
+    else:
+        denom = (m**2) * (n**3 - n)
     
-    denom = (m**2) * (n**3 - n) - m * T_total
-    
-    # 2. Suma de Rangos (S_val) sin tensores masivos
+    # Suma de Rangos (S_val)
     S_val = np.zeros(S)
     mean_R = m * (n + 1) / 2.0
     
-    # Iteramos sobre las réplicas para mantener la huella de memoria en O(n*m)
     for s in range(S):
-        X_s = X_3d[s] # Matriz 2D (Sujetos x Jueces)
-        
-        # DataFrame.rank(method='average') es extremadamente rápido para rangos ordinales fraccionales
+        X_s = X_3d[s]
         ranks = pd.DataFrame(X_s).rank(method='average').values
-        
         R_i = np.sum(ranks, axis=1)
         S_val[s] = np.sum((R_i - mean_R)**2)
         
@@ -48,24 +49,39 @@ def _compute_w_vectorized(X_3d):
     return W
 
 # ==============================================================================
-# 2. Cálculo Teórico Poblacional (Matriz Asintótica Masiva de Columnas)
+# 2. Cálculo Teórico Poblacional (Matriz Asintótica con M_pop Adaptativo)
 # ==============================================================================
-def calcular_w_poblacion_asintotica(matriz_entrada, k_escala=5, multiplicador=1000):
+def calcular_w_poblacion_asintotica(matriz_entrada, k_escala=5, multiplicador=None):
     n, m = matriz_entrada.shape
     c_arr = np.zeros(m, dtype=int)
     for val in range(1, k_escala + 1):
         c_arr += (matriz_entrada == val).any(axis=0).astype(int)
         
     pesos = np.array([comb(k_escala, c) for c in c_arr], dtype=float)
-    if np.sum(pesos) == 0: return np.nan
-    prob = pesos / np.sum(pesos)
+    sum_pesos = np.sum(pesos)
+    if sum_pesos == 0: 
+        return np.nan
+        
+    prob = pesos / sum_pesos
     
-    M_pop = m * multiplicador
+    # --- 1. ESCALADO ADAPTATIVO DE EVALUADORES (COLUMNAS) ---
+    if multiplicador is None:
+        # Acotamos M_pop entre 100 y 1.000 columnas para proteger la RAM
+        M_pop = int(np.clip(m * 100, 100, 1_000))
+    else:
+        M_pop = int(m * multiplicador)
+    
     counts = np.round(prob * M_pop).astype(int)
     
+    # Ajuste de diferencias por redondeo
     diff = M_pop - np.sum(counts)
-    if diff > 0: counts[np.argmax(prob)] += diff
-    elif diff < 0: counts[np.argmax(counts)] += diff
+    if diff > 0: 
+        counts[np.argmax(prob)] += diff
+    elif diff < 0: 
+        counts[np.argmax(counts)] += diff
+        
+    # --- 2. SANITIZACIÓN CRÍTICA CONTRA VALORES NEGATIVOS ---
+    counts = np.maximum(0, counts).astype(int)
         
     X_massive = np.repeat(matriz_entrada, counts, axis=1)
     w_pob_real = _compute_w_vectorized(X_massive[None, :, :])[0]

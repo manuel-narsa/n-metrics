@@ -79,9 +79,9 @@ def _compute_aki_vectorized_bc(X_3d):
     return aki_vals
 
 # ==============================================================================
-# 3. Cálculo Teórico Poblacional (Matriz Asintótica Masiva)
+# 3. Cálculo Teórico Poblacional (Matriz Asintótica Masiva con N_pop Adaptativo)
 # ==============================================================================
-def calcular_aki_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multiplicador=1000):
+def calcular_aki_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multiplicador=None):
     """
     Construye el universo termodinámico físico clonando filas y lo evalúa
     usando la fórmula de AKI original pura.
@@ -91,18 +91,29 @@ def calcular_aki_poblacion_asintotica(matriz_entrada, k_min=1, k_max=5, multipli
     
     sum_pesos = np.sum(pesos)
     if sum_pesos == 0: 
-        return np.nan # Seguridad por si toda la matriz está vacía o sin consenso posible
+        return np.nan
         
     prob = pesos / sum_pesos
-    
     n, k = matriz_entrada.shape
-    N_pop = n * multiplicador
+    
+    # --- ESCALADO ADAPTATIVO DE POBLACIÓN OBJETIVO ---
+    if multiplicador is None:
+        # Fijamos una población objetivo entre 100.000 y 500.000 filas
+        N_pop = int(np.clip(n * 1000, 100_000, 500_000))
+    else:
+        N_pop = int(n * multiplicador)
     
     counts = np.round(prob * N_pop).astype(int)
     
+    # Ajuste de diferencias por redondeo
     diff = N_pop - np.sum(counts)
-    if diff > 0: counts[np.argmax(prob)] += diff
-    elif diff < 0: counts[np.argmax(counts)] += diff
+    if diff > 0: 
+        counts[np.argmax(prob)] += diff
+    elif diff < 0: 
+        counts[np.argmax(counts)] += diff
+    
+    # Sanitización crítica contra valores negativos
+    counts = np.maximum(0, counts).astype(int)
         
     X_massive = np.repeat(matriz_entrada, counts, axis=0)
     

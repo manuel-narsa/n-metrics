@@ -43,25 +43,39 @@ def _compute_ako_vectorized(X_3d, k_escala=None):
     return ako
 
 # ==============================================================================
-# 2. Cálculo Teórico Poblacional (Matriz Asintótica Masiva de Columnas)
+# 2. Cálculo Teórico Poblacional (Matriz Asintótica con M_pop Adaptativo)
 # ==============================================================================
-def calcular_ako_poblacion_asintotica(matriz_entrada, k_escala=5, multiplicador=1000):
+def calcular_ako_poblacion_asintotica(matriz_entrada, k_escala=5, multiplicador=None):
     n, m = matriz_entrada.shape
     c_arr = np.zeros(m, dtype=int)
     for val in range(1, k_escala + 1):
         c_arr += (matriz_entrada == val).any(axis=0).astype(int)
         
     pesos = np.array([comb(k_escala, c) for c in c_arr], dtype=float)
-    if np.sum(pesos) == 0: return np.nan
-    prob = pesos / np.sum(pesos)
+    sum_pesos = np.sum(pesos)
+    if sum_pesos == 0: 
+        return np.nan
+        
+    prob = pesos / sum_pesos
     
-    # Expandimos masivamente a M jueces proporcionales a su peso combinatorio
-    M_pop = m * multiplicador
+    # --- 1. ESCALADO ADAPTATIVO DE EVALUADORES (COLUMNAS) ---
+    if multiplicador is None:
+        # Acotamos M_pop entre 100 y 1.000 columnas para proteger la RAM
+        M_pop = int(np.clip(m * 100, 100, 1_000))
+    else:
+        M_pop = int(m * multiplicador)
+    
     counts = np.round(prob * M_pop).astype(int)
     
+    # Ajuste de diferencias por redondeo
     diff = M_pop - np.sum(counts)
-    if diff > 0: counts[np.argmax(prob)] += diff
-    elif diff < 0: counts[np.argmax(counts)] += diff
+    if diff > 0: 
+        counts[np.argmax(prob)] += diff
+    elif diff < 0: 
+        counts[np.argmax(counts)] += diff
+        
+    # --- 2. SANITIZACIÓN CRÍTICA CONTRA VALORES NEGATIVOS ---
+    counts = np.maximum(0, counts).astype(int)
         
     X_massive = np.repeat(matriz_entrada, counts, axis=1)
     ako_pob_real = _compute_ako_vectorized(X_massive[None, :, :], k_escala)[0]
