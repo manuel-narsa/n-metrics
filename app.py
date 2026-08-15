@@ -28,13 +28,36 @@ from nmetrics.utils.simulations import ejecutar_auditoria_cobertura, ejecutar_du
 DB_DICCIONARIOS_PATH = "diccionarios_estados.json"
 
 # ==============================================================================
+# limpiar y recuperar las tuplas
+# ==============================================================================
+def convertir_claves_a_tuplas(d):
+    """Convierte las claves serializadas como string en JSON de vuelta a tuplas."""
+    if not isinstance(d, dict):
+        return d
+    nuevo_dict = {}
+    for k, v in d.items():
+        nueva_clave = k
+        if isinstance(k, str) and (k.startswith("(") or k.startswith("[")):
+            try:
+                evaluado = ast.literal_eval(k)
+                if isinstance(evaluado, (tuple, list)):
+                    nueva_clave = tuple(evaluado)
+            except Exception:
+                pass
+        nuevo_dict[nueva_clave] = convertir_claves_a_tuplas(v) if isinstance(v, dict) else v
+    return nuevo_dict
+# ==============================================================================
 # INICIALIZACIÓN DEL SESSION STATE
 # ==============================================================================
 if "base_diccionarios" not in st.session_state:
     if os.path.exists(DB_DICCIONARIOS_PATH):
         try:
             with open(DB_DICCIONARIOS_PATH, "r", encoding="utf-8") as f:
-                st.session_state["base_diccionarios"] = json.load(f)
+                raw_base = json.load(f)
+                st.session_state["base_diccionarios"] = {
+                    nombre: convertir_claves_a_tuplas(dict_est)
+                    for nombre, dict_est in raw_base.items()
+                }
         except Exception:
             st.session_state["base_diccionarios"] = {}
     else:
@@ -42,6 +65,20 @@ if "base_diccionarios" not in st.session_state:
 
 if "diccionario_estados" not in st.session_state:
     st.session_state["diccionario_estados"] = {}
+    
+def cargar_base_diccionarios(filepath=DB_DICCIONARIOS_PATH):
+    """Carga la base de datos de diccionarios de macroestados desde disco (JSON)."""
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                raw_base = json.load(f)
+                return {
+                    nombre: convertir_claves_a_tuplas(dict_est)
+                    for nombre, dict_est in raw_base.items()
+                }
+        except Exception:
+            return {}
+    return {}    
 
 # ==============================================================================
 # GESTIÓN DE ARCHIVOS Y BASE DE DATOS DE FIRMAS (JSON PRECALCULADO)
@@ -284,7 +321,7 @@ if archivo_subido is not None and ('df_original_raw' not in st.session_state or 
 if 'df_original_raw' in st.session_state and st.session_state['df_original_raw'] is not None and len(st.session_state['df_original_raw']) > 0:
     st.sidebar.success(f"✅ Matriz activa: {st.session_state.get('n_total', 0):,} sujetos.")
     if st.session_state.get('usar_sintetica'):
-        if st.sidebar.button("🗑️ Borrar Matriz Sintética", use_container_width=True):
+        if st.sidebar.button("🗑️ Borrar Matriz Sintética", width='stretch'):
             reset_session_state()
             st.session_state["topologia_activa"] = "Intervalar (Discreta/Continua)"
             st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
@@ -300,8 +337,21 @@ if base_bd:
     seleccion_dict = st.sidebar.selectbox("Diccionarios guardados", opciones_dict, key="sel_dict_bd")
     
     if seleccion_dict != "-- Seleccionar Dataset Guardado --":
-        if st.sidebar.button("📥 Cargar Diccionario Seleccionado", use_container_width=True):
-            st.session_state["diccionario_estados"] = base_bd[seleccion_dict]
+        if st.sidebar.button("📥 Cargar Diccionario Seleccionado", width='stretch'):
+            dict_cargado = convertir_claves_a_tuplas(base_bd[seleccion_dict])
+            st.session_state["diccionario_estados"] = dict_cargado
+            st.session_state["n_total"] = sum(dict_cargado.values())
+            
+            # Reconstruir la matriz original cruda para que los estimadores clásicos y validaciones no fallen
+            filas_reconstruidas = []
+            for vec, freq in dict_cargado.items():
+                if isinstance(vec, (tuple, list)):
+                    for _ in range(int(freq)):
+                        filas_reconstruidas.append(list(vec))
+            
+            if filas_reconstruidas:
+                st.session_state["df_original_raw"] = pd.DataFrame(filas_reconstruidas)
+            
             st.sidebar.success(f"Diccionario '{seleccion_dict}' activo en memoria.")
             st.rerun()
 else:
@@ -412,7 +462,7 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
         st.success(f"🚀 Análisis Activo: Procesando {n_sujetos:,} registros con {m_jueces} jueces y escala {k_escala}.")
         with st.expander("👁️ Ver Matriz", expanded=False):
             df_vis = pd.DataFrame(matriz_original, columns=[f"J{j+1:03d}" for j in range(m_jueces)], index=[f"S{i+1:03d}" for i in range(n_sujetos)])
-            st.dataframe(df_vis, use_container_width=True)
+            st.dataframe(df_vis, width='stretch')
 
     if "Intervalar" in topologia: opciones = ["NI (Marco N)", "AKI (Bootstrap C.)", "ICC(2,1) (F-ANOVA)"]
     elif "Nominal" in topologia: opciones = ["NN (Marco N)", "AKN (Bootstrap C.)", "Kappa Fleiss (Bootstrap C.)"]
@@ -461,7 +511,7 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
                 except Exception: pass
                 return estilos
 
-            st.dataframe(df_res[columnas_a_mostrar].style.format(formatos).apply(auditar, axis=1), use_container_width=True)
+            st.dataframe(df_res[columnas_a_mostrar].style.format(formatos).apply(auditar, axis=1), width='stretch')
             
         st.markdown("---")
         st.markdown(f"### 🔍 Escáner de Anomalías ({'Jueces Disidentes' if 'Ordinal' in topologia else 'Macroestados'})")
@@ -511,7 +561,7 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
                     if not df_anomalos.empty:
                         st.warning(f"🚨 Detectados {len(df_anomalos)} {datos_a['tipo'].lower()} anómalos:")
                         df_visual = df_anomalos[['Acuerdo_Local']].rename(columns={'Acuerdo_Local': 'Acuerdo Local (A)'})
-                        st.dataframe(df_visual.style.format("{:.4f}").apply(lambda x: ['background-color: #fee2e2; color: #dc3545; font-weight: bold;']*len(x), axis=1), use_container_width=True)
+                        st.dataframe(df_visual.style.format("{:.4f}").apply(lambda x: ['background-color: #fee2e2; color: #dc3545; font-weight: bold;']*len(x), axis=1), width='stretch')
                     else: st.success(f"✨ Sistema estable bajo $\\sigma = {umbral_sigma}$.")
 
 # ==============================================================================
@@ -580,7 +630,7 @@ elif st.session_state["pestaña_activa"] == '🎯 Pruebas de Cobertura':
                         "µ(Población Real)": "{:.4f}", "µ(Valor Muestra)": "{:.4f}", "Media Ancho IC": "{:.4f}"
                     }
                     formato_valido = {k: v for k, v in formato_columnas.items() if k in df_cob.columns}
-                    st.dataframe(df_cob.style.format(formato_valido), use_container_width=True)
+                    st.dataframe(df_cob.style.format(formato_valido), width='stretch')
 
 # ==============================================================================
 # PESTAÑA 3: INFORME MULTIRRANGO
@@ -722,7 +772,7 @@ elif st.session_state["pestaña_activa"] == '📈 Informe Multirrango':
             if metrica_sel == col_cob_pob:
                 fig.update_yaxes(range=[0, 105])
                 fig.add_hline(y=95, line_dash="dash", line_color="green", annotation_text="Meta 95%")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
 
 # ==============================================================================
 # PESTAÑA 4: INVARIANZA Y SENSIBILIDAD
@@ -789,7 +839,7 @@ elif st.session_state["pestaña_activa"] == '🔄 Invarianza (n) y Sensibilidad 
             if res_inv:
                 df_inv = pd.DataFrame(res_inv)
                 df_inv["Var"] = df_inv["Repl"] - df_inv["Orig"]
-                st.dataframe(df_inv.style.format({"Orig": "{:.4f}", "Repl": "{:.4f}", "Ancho O": "{:.4f}", "Ancho R": "{:.4f}", "Var": "{:+.4f}"}), use_container_width=True)
+                st.dataframe(df_inv.style.format({"Orig": "{:.4f}", "Repl": "{:.4f}", "Ancho O": "{:.4f}", "Ancho R": "{:.4f}", "Var": "{:+.4f}"}), width='stretch')
 
 # ==============================================================================
 # PESTAÑA 5: GENERADOR DE MATRICES SINTÉTICAS
@@ -811,7 +861,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
     if "df_base_1" not in st.session_state or st.session_state.get("gk_last_base1") != gen_k:
         st.session_state["df_base_1"] = pd.DataFrame(np.full((1, gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=["Prob (%)"])
         st.session_state["gk_last_base1"] = gen_k
-    edit_base_1 = st.data_editor(st.session_state["df_base_1"], use_container_width=True, key="edit_base_1")
+    edit_base_1 = st.data_editor(st.session_state["df_base_1"], width='stretch', key="edit_base_1")
 
     modo = st.radio("Selecciona el modo de patrón:", ["Patrón global", "Patrón por sujeto"], horizontal=True, label_visibility="collapsed")
     
@@ -821,7 +871,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
         if st.session_state.get("last_state_key") != (gen_n, gen_k, base_hash):
             st.session_state["df_n_rows"] = pd.DataFrame(np.tile(edit_base_1.values, (gen_n, 1)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=[f"S{i+1}" for i in range(gen_n)])
             st.session_state["last_state_key"] = (gen_n, gen_k, base_hash)
-        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], use_container_width=True)
+        edit_n_rows = st.data_editor(st.session_state["df_n_rows"], width='stretch')
 
     st.markdown("#### Excepciones (Agujeros Negros)")
     excepciones = st.multiselect("Selecciona sujetos para inyectar anomalías:", [f"S{i+1}" for i in range(gen_n)])
@@ -831,7 +881,7 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
             st.session_state["df_exc"] = pd.DataFrame(np.full((len(excepciones), gen_k), round(100/gen_k, 2)), columns=[f"V{i}" for i in range(1, gen_k+1)], index=excepciones)
             st.session_state["exc_last"] = excepciones
             st.session_state["exc_last_k"] = gen_k
-        edit_exc = st.data_editor(st.session_state["df_exc"], use_container_width=True)
+        edit_exc = st.data_editor(st.session_state["df_exc"], width='stretch')
 
     def crear_matriz_sintetica():
         base_p = edit_base_1.iloc[0].values
@@ -866,13 +916,13 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        if st.button("Preparar Descarga", use_container_width=True):
+        if st.button("Preparar Descarga", width='stretch'):
             st.session_state['matriz_csv_temp'] = crear_matriz_sintetica()
         if 'matriz_csv_temp' in st.session_state:
-            st.download_button("Descargar CSV", st.session_state['matriz_csv_temp'].to_csv(index=False), "matriz_sintetica.csv", "text/csv", use_container_width=True)
+            st.download_button("Descargar CSV", st.session_state['matriz_csv_temp'].to_csv(index=False), "matriz_sintetica.csv", "text/csv", width='stretch')
 
     with col_b2:
-        if st.button("🚀 Generar y Cargar en la App", type="primary", use_container_width=True):
+        if st.button("🚀 Generar y Cargar en la App", type="primary", width='stretch'):
             with st.spinner("Sintetizando..."):
                 df_sintetico = crear_matriz_sintetica()
                 import io
@@ -941,7 +991,7 @@ elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
                         c2.metric("Sesgo N (Bias)", f"{n_bias:.6f}", f"{abs(n_bias) - abs(a_bias):+.6f} magnitud vs Clásico", delta_color="inverse")
                     except Exception: pass
                     
-                    st.dataframe(df_duel, use_container_width=True)
+                    st.dataframe(df_duel, width='stretch')
 
 # ==============================================================================
 # PESTAÑA 7: BASE DE DATOS DE DICCIONARIOS Y FIRMAS
@@ -973,7 +1023,7 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
             
             st.markdown("---")
             st.markdown("#### 📊 Distribución de Clases de Equivalencia (Firmas)")
-            st.dataframe(df_firmas, use_container_width=True, hide_index=True)
+            st.dataframe(df_firmas, width='stretch', hide_index=True)
             
         else:
             # 2. Fallback procesado ligero si no existe JSON precalculado
@@ -1019,7 +1069,7 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
                 })
                 
             df_firmas = pd.DataFrame(filas_firmas)
-            st.dataframe(df_firmas, use_container_width=True, hide_index=True)
+            st.dataframe(df_firmas, width='stretch', hide_index=True)
             
             with st.expander("🔍 Ver todos los microestados agrupados por Firma"):
                 for firma, datos in firmas_dict.items():
@@ -1052,7 +1102,7 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
                     data=pdf_file,
                     file_name="N-Metrics_Logic_Blueprint.pdf",
                     mime="application/pdf",
-                    use_container_width=True
+                    width='stretch'
                 )
         else:
             st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
