@@ -101,9 +101,6 @@ def guardar_base_diccionarios(base_dict, filepath=DB_DICCIONARIOS_PATH):
 # ==============================================================================
 # MOTOR DE INFERENCIA DE UI 
 # ==============================================================================
-# ==============================================================================
-# MOTOR DE INFERENCIA DE UI 
-# ==============================================================================
 def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estimadores, m_jueces, n_total, matriz_np):
     """Enrutador principal de cálculos que alimenta las tablas de la interfaz."""
     resultados_inf = []
@@ -113,7 +110,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
         try:
             # Envoltorio de estado visual para el proceso de 2 minutos
             with st.status("Calculando Coeficiente NI...", expanded=True) as status:
-                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos, dependiendo del valor de m)...")
+                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos para m=130 ...")
                 
                 # Llamadas intactas a tu librería ni_core
                 ni_muestra, pob_real, inf, sup = ni_core.calcular_estadisticas_ni_unificada(dict_estados, k_calc, replicas)
