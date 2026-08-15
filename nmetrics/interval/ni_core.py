@@ -16,12 +16,27 @@ import streamlit as st
 @st.cache_data(ttl=3600)  
 def get_macrostate_dictionary_ni(m_jueces: int, k_escala: int):
     """
-    Recupera el diccionario de macroestados desde n_metrics_cache.db con control 
-    explícito de errores para evitar fallos silenciosos.
+    Recupera el diccionario de macroestados desde n_metrics_cache.db.
+    Si la tabla o la BD no existen, las inicializa automáticamente 
+    y recurre al fallback algorítmico sin interrumpir al usuario.
     """
     try:
         conn = sqlite3.connect("n_metrics_cache.db")
         cursor = conn.cursor()
+        
+        # Crear la tabla automáticamente si no existe en el entorno
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS macroestados_cache (
+                metrica TEXT,
+                m INTEGER,
+                k INTEGER,
+                data_json TEXT,
+                PRIMARY KEY (metrica, m, k)
+            )
+        """)
+        conn.commit()
+
+        # Buscar el registro solicitado
         cursor.execute(
             "SELECT data_json FROM macroestados_cache WHERE metrica=? AND m=? AND k=?",
             ("NI", m_jueces, k_escala)
@@ -32,17 +47,13 @@ def get_macrostate_dictionary_ni(m_jueces: int, k_escala: int):
         if row:
             data = json.loads(row[0])
             return {float(k): v for k, v in data.items()}
-        else:
-            # Esto te avisa en pantalla si SQLite no tiene el registro exacto
-            st.warning(f"⚠️ SQLite no encontró m={m_jueces}, k={k_escala}. Usando fallback algorítmico.")
-    except Exception as e:
-        # Esto te muestra si la base de datos falló por bloqueos o rutas
-        st.error(f"❌ Error crítico leyendo SQLite: {e}")
+            
+    except Exception:
+        # Si ocurre cualquier anomalía con SQLite, pasa silenciosamente al fallback
+        pass
 
-    # Fallback si no existe en la BD o falla la lectura
+    # Fallback: Cálculo en vivo mediante Formas Ancladas si no está en caché
     return _build_macrostate_dictionary(m_jueces, k_escala)
-
-
 # SE ELIMINÓ EL DECORADOR @lru_cache(maxsize=128) AQUÍ PARA LIBERAR RAM
 def _build_macrostate_dictionary(m_jueces: int, k_escala: int):
     """Generador algorítmico de macroestados mediante Formas Ancladas."""
