@@ -182,37 +182,37 @@ def guardar_base_diccionarios(base_dict, filepath=DB_DICCIONARIOS_PATH):
     except Exception:
         return False
 
-# ==============================================================================
-# DIAGNÓSTICO RÁPIDO DE LA BASE DE DATOS SQLITE
-# ==============================================================================
-import os
+# # ==============================================================================
+# # DIAGNÓSTICO RÁPIDO DE LA BASE DE DATOS SQLITE
+# # ==============================================================================
+# import os
 
-# Definir la ruta base y la ruta de la base de datos de caché
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_CACHES_PATH = os.path.join(BASE_DIR, "n_metrics_cache.db")  # Reemplaza "n_metrics_cache.db" por el nombre exacto de tu archivo .db si es diferente
-import sqlite3
+# # Definir la ruta base y la ruta de la base de datos de caché
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# DB_CACHES_PATH = os.path.join(BASE_DIR, "n_metrics_cache.db")  # Reemplaza "n_metrics_cache.db" por el nombre exacto de tu archivo .db si es diferente
+# import sqlite3
 
-if st.sidebar.checkbox("🛠️ Ejecutar Diagnóstico de SQLite"):
-    if os.path.exists(DB_CACHES_PATH):
-        try:
-            conn = sqlite3.connect(DB_CACHES_PATH)
-            cursor = conn.cursor()
+# if st.sidebar.checkbox("🛠️ Ejecutar Diagnóstico de SQLite"):
+    # if os.path.exists(DB_CACHES_PATH):
+        # try:
+            # conn = sqlite3.connect(DB_CACHES_PATH)
+            # cursor = conn.cursor()
             
-            # 1. Ver las columnas reales de la tabla
-            cursor.execute("PRAGMA table_info(macroestados_cache);")
-            columnas = [col[1] for col in cursor.fetchall()]
-            st.write("📌 **Columnas reales en la BD:**", columnas)
+            # # 1. Ver las columnas reales de la tabla
+            # cursor.execute("PRAGMA table_info(macroestados_cache);")
+            # columnas = [col[1] for col in cursor.fetchall()]
+            # st.write("📌 **Columnas reales en la BD:**", columnas)
             
-            # 2. Listar todos los m y k disponibles en la caché para verificar qué hay guardado
-            cursor.execute("SELECT DISTINCT metrica, m, k FROM macroestados_cache;")
-            disponibles = cursor.fetchall()
-            st.write("📋 **Pares (Métrica, m, k) almacenados en SQLite:**", disponibles)
+            # # 2. Listar todos los m y k disponibles en la caché para verificar qué hay guardado
+            # cursor.execute("SELECT DISTINCT metrica, m, k FROM macroestados_cache;")
+            # disponibles = cursor.fetchall()
+            # st.write("📋 **Pares (Métrica, m, k) almacenados en SQLite:**", disponibles)
             
-            conn.close()
-        except Exception as e:
-            st.error(f"Error leyendo la estructura de la BD: {e}")
-    else:
-        st.error(f"No se encuentra el archivo de base de datos en: {DB_CACHES_PATH}")
+            # conn.close()
+        # except Exception as e:
+            # st.error(f"Error leyendo la estructura de la BD: {e}")
+    # else:
+        # st.error(f"No se encuentra el archivo de base de datos en: {DB_CACHES_PATH}")
 
 # ==============================================================================
 # MOTOR DE INFERENCIA DE UI 
