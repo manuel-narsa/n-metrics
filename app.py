@@ -113,7 +113,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
         try:
             # Envoltorio de estado visual para el proceso de 2 minutos
             with st.status("Calculando Coeficiente NI...", expanded=True) as status:
-                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos, dependiendo del valoir de m)...")
+                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos, dependiendo del valor de m)...")
                 
                 # Llamadas intactas a tu librería ni_core
                 ni_muestra, pob_real, inf, sup = ni_core.calcular_estadisticas_ni_unificada(dict_estados, k_calc, replicas)
