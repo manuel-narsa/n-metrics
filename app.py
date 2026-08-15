@@ -24,7 +24,6 @@ from nmetrics.ordinal import no_core, ako_core, w_core
 
 from nmetrics.utils.data_handler import reset_session_state, cargar_y_agregar_dataset, validar_condiciones_analisis
 from nmetrics.utils.simulations import ejecutar_auditoria_cobertura, ejecutar_duelo_ia
-from collections import Counter
 
 DB_DICCIONARIOS_PATH = "diccionarios_estados.json"
 
@@ -43,23 +42,29 @@ if "base_diccionarios" not in st.session_state:
 
 if "diccionario_estados" not in st.session_state:
     st.session_state["diccionario_estados"] = {}
-# ==============================================================================
-# GESTIÓN DE LA BASE DE DATOS LOCAL DE DICCIONARIOS (JSON)
-# ==============================================================================
-def calcular_firma(vector, k=None):
-    """
-    Calcula la firma (clase de equivalencia) de un vector de estado.
-    La firma es el perfil de frecuencias de categorías ordenado de forma decreciente,
-    representando la partición de m elementos.
-    """
-    conteo = Counter(vector)
-    # Tomamos las frecuencias de cada categoría presente y las ordenamos
-    firma = tuple(sorted(conteo.values(), reverse=True))
-    return firma
 
-if "diccionario_estados" not in st.session_state:
-    st.session_state["diccionario_estados"] = {}
-DB_DICCIONARIOS_PATH = "diccionarios_estados.json"
+# ==============================================================================
+# GESTIÓN DE ARCHIVOS Y BASE DE DATOS DE FIRMAS (JSON PRECALCULADO)
+# ==============================================================================
+@st.cache_data(show_spinner=False)
+def cargar_firmas_precalculadas(m: int):
+    """
+    Carga el diccionario precalculado de firmas/clases de equivalencia 
+    para una dimensión m específica desde la carpeta 'data/'.
+    """
+    path_json = os.path.join("data", f"firmas_m_{m}.json")
+    if os.path.exists(path_json):
+        try:
+            with open(path_json, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+    return None
+
+def calcular_firma(vector):
+    """Calcula la firma de un vector de estado de forma secuencial (Fallback)."""
+    conteo = Counter(vector)
+    return tuple(sorted(conteo.values(), reverse=True))
 
 def cargar_base_diccionarios(filepath=DB_DICCIONARIOS_PATH):
     """Carga la base de datos de diccionarios de macroestados desde disco (JSON)."""
@@ -67,17 +72,15 @@ def cargar_base_diccionarios(filepath=DB_DICCIONARIOS_PATH):
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
+        except Exception:
             return {}
     return {}
     
 def sanitizar_para_json(obj):
-    """Convierte recursivamente las claves de diccionarios (como tuplas de macroestados)
-    a cadenas de texto limpias (sin np.int64) para garantizar compatibilidad con JSON."""
+    """Convierte recursivamente las claves a cadenas limpias para JSON."""
     if isinstance(obj, dict):
         dict_limpio = {}
         for k, v in obj.items():
-            # Si la clave es una tupla o lista, convertimos cada elemento a int nativo de Python
             if isinstance(k, (tuple, list)):
                 clave_limpia = str(tuple(int(x) for x in k))
             else:
@@ -95,7 +98,7 @@ def guardar_base_diccionarios(base_dict, filepath=DB_DICCIONARIOS_PATH):
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(dict_preparado, f, ensure_ascii=False, indent=4)
         return True
-    except Exception as e:
+    except Exception:
         return False
 
 # ==============================================================================
@@ -108,16 +111,11 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
     # --- A. MOTOR UNIFICADO: NI (Intervalar) ---
     if "Intervalar" in topologia and "NI (Marco N)" in estimadores:
         try:
-            # Envoltorio de estado visual para el proceso de 2 minutos
             with st.status("Calculando Coeficiente NI...", expanded=True) as status:
-                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos para m=130 ...")
-                
-                # Llamadas intactas a tu librería ni_core
+                st.write("Procesando matriz y masa entrópica en la nube...")
                 ni_muestra, pob_real, inf, sup = ni_core.calcular_estadisticas_ni_unificada(dict_estados, k_calc, replicas)
                 p_e = ni_core.calcular_azar_termodinamico_ni(m_jueces, k_calc)
                 perc = ni_core.calcular_percentil_universal_ni(pob_real, m_jueces, k_calc)
-                
-                # Actualización del cuadro al terminar el cálculo
                 status.update(label="¡Cálculo NI completado con éxito!", state="complete", expanded=False)
 
             resultados_inf.append({
@@ -236,7 +234,7 @@ try:
         st.set_page_config(page_title="Métricas N: Termodinámica del Consenso", page_icon=img_icono, layout="wide")
     else:
         st.set_page_config(page_title="Métricas N: Termodinámica del Consenso", layout="wide")
-except:
+except Exception:
     pass
 
 st.markdown("""
@@ -245,7 +243,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-if "topologia_activa" not in st.session_state: st.session_state["topologia_activa"] = "Intervalar (Continua)"
+if "topologia_activa" not in st.session_state: st.session_state["topologia_activa"] = "Intervalar (Discreta/Continua)"
 if "pestaña_activa" not in st.session_state: st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
 topologia = st.session_state["topologia_activa"].split(" ")[0]
 
@@ -256,7 +254,6 @@ st.sidebar.header("📂 Carga de Datos")
 separador = st.sidebar.selectbox("Separador del CSV", [",", ";", "\t"], key="sep_main", on_change=reset_session_state)
 archivo_subido = st.sidebar.file_uploader("Sube tu matriz empírica (CSV, TXT)", type=["csv", "txt"], on_change=reset_session_state)
 
-# ✅ CÓDIGO CORREGIDO:
 if archivo_subido is not None and ('df_original_raw' not in st.session_state or st.session_state['df_original_raw'] is None):
     with st.sidebar.status("⚙️ Procesando matriz...", expanded=True) as status:
         try:
@@ -266,16 +263,12 @@ if archivo_subido is not None and ('df_original_raw' not in st.session_state or 
             st.session_state["topologia_activa"] = "Intervalar (Discreta/Continua)"
             st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
             
-            # ------------------------------------------------------------------
-            # REGISTRAR EN LA BD DE DICCIONARIOS (BLINDAJE DE ESCRITURA)
-            # ------------------------------------------------------------------
             if "base_diccionarios" not in st.session_state:
                 st.session_state["base_diccionarios"] = {}
 
             nombre_ds = getattr(archivo_subido, "name", "Dataset_Cargado")
             st.session_state["base_diccionarios"][nombre_ds] = dict_est
             guardar_base_diccionarios(st.session_state["base_diccionarios"])
-            # ------------------------------------------------------------------
             
             archivo_subido.seek(0)
             df_raw_loaded = pd.read_csv(archivo_subido, sep=separador, header=None)
@@ -296,13 +289,9 @@ if 'df_original_raw' in st.session_state and st.session_state['df_original_raw']
             st.session_state["pestaña_activa"] = "📊 Cálculo del Consenso"
             st.rerun()
 
-# --- DICCIONARIOS DISPONIBLES EN BD ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("📚 Diccionarios en BD")
 
-# ------------------------------------------------------------------------------
-# CONSULTA SEGURA CON .get()
-# ------------------------------------------------------------------------------
 base_bd = st.session_state.get("base_diccionarios", {})
 
 if base_bd:
@@ -365,7 +354,7 @@ if matriz_original is not None:
         if escala_valida:
             rango_escala = limite_superior - limite_inferior
             if rango_escala <= 0:
-                st.sidebar.error("🚨 El límite superior debe ser strictly mayor que el límite inferior.")
+                st.sidebar.error("🚨 El límite superior debe ser mayor que el límite inferior.")
                 escala_valida = False
             else:
                 k_escala = int(round(rango_escala + 1)) 
@@ -391,7 +380,7 @@ if not escala_valida:
 col_logo, col_titulo = st.columns([1, 15], vertical_alignment="center") 
 with col_logo:
     try: st.image("icono.png", width=60)
-    except: pass
+    except Exception: pass
 with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica, auditoría topológica y procesamiento a escala de Big Data de matrices empíricas.")
@@ -468,7 +457,7 @@ if st.session_state["pestaña_activa"] == '📊 Cálculo del Consenso':
                                 val = float(row[col])
                                 idx = list(row.index).index(col)
                                 estilos[idx] = 'color: #28a745; font-weight: bold;' if inf <= val <= sup else 'color: #dc3545; font-weight: bold;'
-                except: pass
+                except Exception: pass
                 return estilos
 
             st.dataframe(df_res[columnas_a_mostrar].style.format(formatos).apply(auditar, axis=1), width="stretch")
@@ -949,12 +938,12 @@ elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
                         
                         c1.metric("Precisión N (MSE)", f"{n_mse:.6f}", f"{n_mse - a_mse:+.6f} vs Clásico", delta_color="inverse")
                         c2.metric("Sesgo N (Bias)", f"{n_bias:.6f}", f"{abs(n_bias) - abs(a_bias):+.6f} magnitud vs Clásico", delta_color="inverse")
-                    except: pass
+                    except Exception: pass
                     
                     st.dataframe(df_duel, width="stretch")
 
 # ==============================================================================
-# PESTAÑA 7: BASE DE DATOS DE DICCIONARIOS Y FIRMAS
+# PESTAÑA 7: BASE DE DATOS DE DICCIONARIOS Y FIRMAS (OPTIMIZADA SIN DICCIONARIOS EN RAM)
 # ==============================================================================
 elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
     st.markdown("### 🧬 Análisis de Clases de Equivalencia y Firmas")
@@ -963,65 +952,77 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
     dict_activo = st.session_state.get("diccionario_estados")
     
     if dict_activo:
-        # 1. Deducción automática de m (evaluadores) y k (niveles/categorías)
         primer_vector = next(iter(dict_activo.keys()))
         m = len(primer_vector)
         
-        todas_categorias = set()
-        for vec in dict_activo.keys():
-            todas_categorias.update(vec)
-        k = len(todas_categorias)
+        # 1. Intento de carga directa desde JSON precalculado en carpeta data/
+        firmas_json = cargar_firmas_precalculadas(m)
         
-        # 2. Agrupación por Clases de Equivalencia (Firmas)
-        firmas_dict = {}
-        for vec, freq in dict_activo.items():
-            firma = calcular_firma(vec, k)
+        if firmas_json is not None:
+            st.success(f"⚡ Carga ultrarrápida: Leyendo firmas teóricas precalculadas para $m={m}$ desde disco.")
+            k = firmas_json.get("k", len(set().union(*dict_activo.keys())))
+            df_firmas = pd.DataFrame(firmas_json.get("firmas", []))
+            u_micro = len(dict_activo)
             
-            # Limpieza explícita del vector de ejemplo (sin np.int64)
-            if isinstance(vec, (tuple, list, np.ndarray)):
-                vec_limpio = str(tuple(int(x) for x in vec))
-            else:
-                vec_limpio = str(vec)
-                
-            if firma not in firmas_dict:
-                firmas_dict[firma] = {
-                    "microestados_unicos": 0,
-                    "frecuencia_total": 0,
-                    "ejemplo_microestado": vec_limpio
-                }
-            firmas_dict[firma]["microestados_unicos"] += 1
-            firmas_dict[firma]["frecuencia_total"] += freq
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Dimensión m (Evaluadores)", m)
+            col2.metric("Categorías k Observadas", k)
+            col3.metric("Clases / Firmas Activas", len(df_firmas))
+            col4.metric("Microestados Únicos", u_micro)
+            
+            st.markdown("---")
+            st.markdown("#### 📊 Distribución de Clases de Equivalencia (Firmas)")
+            st.dataframe(df_firmas, width='stretch', hide_index=True)
+            
+        else:
+            # 2. Fallback procesado ligero si no existe JSON precalculado
+            st.info(f"Procesando firmas en tiempo de ejecución para $m={m}$...")
+            todas_categorias = set()
+            for vec in dict_activo.keys():
+                todas_categorias.update(vec)
+            k = len(todas_categorias)
+            
+            firmas_dict = {}
+            for vec, freq in dict_activo.items():
+                firma = calcular_firma(vec)
+                vec_limpio = str(tuple(int(x) for x in vec)) if isinstance(vec, (tuple, list, np.ndarray)) else str(vec)
+                    
+                if firma not in firmas_dict:
+                    firmas_dict[firma] = {
+                        "microestados_unicos": 0,
+                        "frecuencia_total": 0,
+                        "ejemplo_microestado": vec_limpio
+                    }
+                firmas_dict[firma]["microestados_unicos"] += 1
+                firmas_dict[firma]["frecuencia_total"] += freq
 
-        # 3. Métricas Principales del Sistema
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Dimensión m (Evaluadores)", m)
-        col2.metric("Categorías k Observadas", k)
-        col3.metric("Clases / Firmas Activas", len(firmas_dict))
-        col4.metric("Microestados Únicos", len(dict_activo))
-        
-        st.markdown("---")
-        st.markdown("#### 📊 Distribución de Clases de Equivalencia (Firmas)")
-        
-        # 4. Tabla de Firmas / Clases
-        filas_firmas = []
-        N_total = sum(d["frecuencia_total"] for d in firmas_dict.values())
-        
-        for firma, datos in sorted(firmas_dict.items(), key=lambda x: x[1]["frecuencia_total"], reverse=True):
-            filas_firmas.append({
-                "Firma / Clase (Partición de m)": str(firma),
-                "Multiplicidad Observada (Microestados)": datos["microestados_unicos"],
-                "Frecuencia Acumulada (n)": datos["frecuencia_total"],
-                "Proporción (p)": round(datos['frecuencia_total'] / N_total, 4),
-                "Ejemplo de Vector": datos["ejemplo_microestado"]
-            })
+            col1, col2, col3, col4 = st.columns(4)
+            col1.metric("Dimensión m (Evaluadores)", m)
+            col2.metric("Categorías k Observadas", k)
+            col3.metric("Clases / Firmas Activas", len(firmas_dict))
+            col4.metric("Microestados Únicos", len(dict_activo))
             
-        df_firmas = pd.DataFrame(filas_firmas)
-        st.dataframe(df_firmas, width='stretch', hide_index=True)
-        
-        # 5. Desglose detallado opcional
-        with st.expander("🔍 Ver todos los microestados agrupados por Firma"):
-            for firma, datos in firmas_dict.items():
-                st.markdown(f"**Firma {firma}:** {datos['microestados_unicos']} microestados | Frecuencia total: {datos['frecuencia_total']}")
+            st.markdown("---")
+            st.markdown("#### 📊 Distribución de Clases de Equivalencia (Firmas)")
+            
+            filas_firmas = []
+            N_total = sum(d["frecuencia_total"] for d in firmas_dict.values())
+            
+            for firma, datos in sorted(firmas_dict.items(), key=lambda x: x[1]["frecuencia_total"], reverse=True):
+                filas_firmas.append({
+                    "Firma / Clase (Partición de m)": str(firma),
+                    "Multiplicidad Observada (Microestados)": datos["microestados_unicos"],
+                    "Frecuencia Acumulada (n)": datos["frecuencia_total"],
+                    "Proporción (p)": round(datos['frecuencia_total'] / N_total, 4) if N_total > 0 else 0,
+                    "Ejemplo de Vector": datos["ejemplo_microestado"]
+                })
+                
+            df_firmas = pd.DataFrame(filas_firmas)
+            st.dataframe(df_firmas, width='stretch', hide_index=True)
+            
+            with st.expander("🔍 Ver todos los microestados agrupados por Firma"):
+                for firma, datos in firmas_dict.items():
+                    st.markdown(f"**Firma {firma}:** {datos['microestados_unicos']} microestados | Frecuencia total: {datos['frecuencia_total']}")
                 
     else:
         st.info("No hay ningún diccionario de estados cargado en la sesión actual. Carga un dataset desde la barra lateral.")
@@ -1030,23 +1031,8 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 # PESTAÑA 8: MANUAL DE USUARIO
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
+    st.write("") 
     
-    # --- BLOQUEO POR REVISIÓN ANÓNIMA POR PARES ---
-    #st.warning(
-    #    "🔒 **Material Multimedia y Documentación Desactivados**\n\n"
-    #    "Para garantizar el rigor y la estricta integridad del proceso de **revisión anónima por pares** "
-    #    "(Double-Blind Peer Review), los vídeos explicativos de la plataforma y la descarga del "
-    #    "manuscrito original en PDF han sido temporalmente ocultados, ya que dicho material contiene "
-    #    "información que revelaría la identidad de la autoría. Todo el material será restaurado de "
-    #    "forma pública una vez finalizado el proceso editorial.",
-    #    icon="🕵️‍♂️"
-    #)
-    
-    st.write("") # Espacio para dar respiro visual
-    
-    # --------------------------------------------------------------------------
-    # CÓDIGO DE MATERIAL MULTIMEDIA Y PDF
-    # --------------------------------------------------------------------------
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
         st.video("https://youtu.be/mHQekxmCxH4")
@@ -1055,11 +1041,9 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
         st.write(""); st.write(""); st.write(""); st.write("")
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
-        # 1. Construimos la ruta dinámica al archivo PDF
         base_dir = os.path.abspath(os.path.dirname(__file__))
         pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
         
-        # 2. Comprobamos que el archivo existe en el servidor para evitar errores
         if os.path.exists(pdf_path):
             with open(pdf_path, "rb") as pdf_file:
                 st.download_button(
@@ -1078,146 +1062,48 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
         
     with col2:
         st.video("https://youtu.be/BjfPvSKJeXA")
-    # --------------------------------------------------------------------------
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
     
     st.markdown("---")
     st.markdown("### 1. El Motor Termodinámico: El Valor Poblacional")
-    st.write("La mayor innovación de esta plataforma radica en cómo descubre la **Verdad Asintótica** (Pob. Real) de tus datos. La estadística clásica calcula directamente sobre tu muestra asumiendo que representa a la población. El Marco N proyecta tu muestra sobre su Espacio de Configuración infinito.")
+    st.write("La mayor innovación de esta plataforma radica en cómo descubre la **Verdad Asintótica** (Pob. Real) de tus datos.")
     st.markdown("""
-    * **1. Extracción de Macroestados:** El algoritmo aísla los patrones topológicos puros de tu matriz (las firmas de consenso), ignorando el ruido y el orden de los sujetos.
-    * **2. Multiplicidad Teórica ($\\Omega$):** Utilizando combinatoria exacta, calcula el 'volumen' geométrico que ocupa cada patrón en el universo total de probabilidades.
-    * **3. Proyección Asintótica:** Pondera las frecuencias de tu muestra empírica cruzándolas con su volumen teórico. Esto reconstruye matemáticamente cómo sería tu matriz si tuvieras infinitos sujetos ($n \\to \\infty$).
-    * **Impacto en el Sistema:** Este Valor Poblacional exacto es el núcleo de las tres pestañas principales:
-        * **📊 Cálculo de Consenso:** Te muestra este valor para revelarte el consenso 'puro' de tu muestra sin ruido estadístico.
-        * **🎯 Pruebas de Cobertura:** Se utiliza como la diana exacta que los Intervalos de Confianza (IC) generados deben intentar atrapar en las simulaciones.
-        * **📈 Informe Multirrango:** Escala este cálculo para auditar miles de configuraciones espaciales ($n, m, k$) de forma masiva.
+    * **1. Extracción de Macroestados:** El algoritmo aísla los patrones topológicos puros de tu matriz (las firmas de consenso).
+    * **2. Multiplicidad Teórica ($\\Omega$):** Utilizando combinatoria exacta, calcula el 'volumen' geométrico que ocupa cada patrón.
+    * **3. Proyección Asintótica:** Pondera las frecuencias de tu muestra empírica cruzándolas con su volumen teórico.
     """)
 
     st.markdown("---")
     st.markdown("### 2. Carga de Datos y Topología (Panel Lateral)")
     st.write("El primer paso es suministrar la materia prima y definir las leyes físicas del hiperespacio de probabilidad.")
-    st.markdown("""
-    * **Archivo CSV:** Sube tu matriz empírica. El formato es estricto: **Sujetos en las filas ($n$)** y **Jueces/Evaluadores en las columnas ($m$)**. 
-        * 🤖 *Autolimpiador Inteligente:* No te preocupes si tu Excel tiene cabeceras (ej. "Juez 1", "Evaluador A") o si la primera columna tiene los nombres de los sujetos (ej. "S001", "Paciente X"). El sistema lo detectará heurísticamente y recortará la matriz para procesar solo los datos puros.
-    * **Naturaleza de los Datos (Topología):** Fundamental. Le dice al motor matemático cómo tratar las distancias.
-        * *Intervalar:* Escalas numéricas continuas (ej. notas del 1 al 10).
-        * *Ordinal:* Escalas categóricas con jerarquía estricta.
-        * *Nominal:* Categóricas puras sin orden. Soporta etiquetas de texto (ej. "Rojo", "Verde", "Enfermo", "Sano"). El sistema las mapeará internamente a clases topológicas (1, 2, 3...) de forma transparente.
-    * **Categorías de la Escala máxima ($k$):** ¡Obligatorio! Es el valor máximo posible de tu escala. Define el "techo" y los límites físicos del hiperespacio.
-    """)
-    
+
     st.markdown("---")
     st.markdown("### 3. Generador de Matrices Sintéticas (Pestaña 4)")
     st.write("Crea matrices termodinámicas a medida para probar las capacidades del sistema o generar casos de estudio controlados.")
-    st.markdown("""
-    * **1. Patrón Base (Norma):** Define las probabilidades (pesos) de que un juez elija cada categoría.
-    * **2. Aplicación del Patrón:** 
-        * *Global:* El patrón base aplica a toda la matriz por igual de forma rápida.
-        * *Por Sujeto:* Abre una tabla interactiva para editar las probabilidades fila por fila, usando el Patrón Base como plantilla inicial (incluye botón de Sincronización).
-    * **3. Excepciones (Agujeros Negros):** Aísla sujetos específicos y aplícales reglas de probabilidad totalmente caóticas o extremas para probar el escáner de anomalías.
-    * **Integración Directa:** El botón **"Generar y Cargar en la App"** inyectará tu matriz sintética apagando temporalmente tu archivo CSV subido, permitiéndote evaluarla al instante.
-    """)
 
     st.markdown("---")
     st.markdown("### 4. Inferencia de Consenso: Marco N vs Clásicos (Pestaña 1)")
-    st.write("Esta sección somete tu matriz a una batalla de estimadores. El Marco N utiliza **Simulación Ponderada (SP)** para no anclarse al sesgo empírico.")
-    st.markdown("""
-    * **Consenso vs. Fiabilidad:** Los estimadores clásicos (como ICC o Alpha de Krippendorff) miden en realidad *Varianza*. Si tu matriz es muy homogénea (todos los sujetos son de sobresaliente y los jueces aciertan), estas métricas colapsarán y dirán que no hay fiabilidad. El **Marco N** mide verdadero *Consenso Geométrico*, manteniéndose estable aunque la varianza sea cero.
-    * **El Suelo de Cristal:** Notarás que a veces el Intervalo de Confianza del Marco N *no contiene* a la Población Real y no baja de cierto número. Esto no es un error: es el simulador demostrándote que tu matriz empírica es tan anómala (ej. 14 perfectos y 1 catastrófico) que la proyección de su fiabilidad ha caído en una "zona prohibida" donde es matemáticamente imposible construir una matriz física.
-    * **Percentil Universal:** Un 85% significa que tu matriz tiene más orden geométrico que el 85% de todos los universos caóticos posibles para tu diseño exacto ($n$, $m$, $k$).
-    """)
+    st.write("Esta sección somete tu matriz a una batalla de estimadores.")
 
     st.markdown("---")
     st.markdown("### 5. Auditoría Estructural: Escáner de Anomalías")
-    st.write("Identifica qué elementos de la matriz (sujetos problemáticos o jueces erráticos) están inyectando entropía excesiva en el sistema. El algoritmo calcula el **Acuerdo Local** de cada fila y lo compara con la termodinámica general de tu matriz. Marcará en rojo aquellos casos que caigan por debajo de un Límite Crítico dinámico, definido por el umbral de sensibilidad ($\\sigma$) que tú elijas:")
+    st.write("Identifica qué elementos de la matriz están inyectando entropía excesiva en el sistema:")
     st.latex(r"Límite = \mu_{local} - (\text{Umbral} \cdot \sigma_{local})")
 
     st.markdown("---")
     st.markdown("### 6. Pruebas de Estrés y Diagnóstico (Pestañas 2 y 3)")
-    st.write("Herramientas avanzadas para auditar la honestidad matemática de los estimadores:")
-    st.markdown("""
-    * **Auditoría de Cobertura (Stress Test):** Simula decenas de universos paralelos ensamblando tuplas combinatorias exactas. Demuestra cómo las métricas clásicas sufren de "Ceguera Espacial" y no logran capturar la Verdad Poblacional, mientras el Marco N mantiene una cobertura de seguridad.
-    * **Auditoría de Invarianza:** El consenso debe ser una *Propiedad Intensiva* (como la temperatura: el agua hierve a 100ºC sea un vaso o un océano). Esta prueba clona tu matriz multiplicando artificialmente el número de sujetos ($n$). Verás cómo el Marco N se mantiene inalterable (Invariante), mientras que los estimadores clásicos bailan y cambian de valor arrastrados por los grados de libertad.
-    """)
-    
-    st.markdown("#### 📊 El Explorador Termodinámico Interactivo")
-    st.write("Una vez generado un **Informe Multirrango** masivo, se desbloqueará un panel gráfico interactivo en la Pestaña 3. Este explorador te permite cruzar dinámicamente las dimensiones estructurales del hiperespacio ($k$ y $m$) para observar cómo las métricas de consenso reaccionan ante diferentes niveles de exigencia (Consenso Objetivo). Podrás visualizar dos grandes indicadores de rendimiento:")
-    
-    st.markdown("""
-    **1. Cobertura Poblacional (%):**
-    Indica el porcentaje de veces que el Intervalo de Confianza (IC) del estimador logró "atrapar" o contener el verdadero consenso poblacional generado en el universo. El estándar del rigor científico exige que esta línea no caiga nunca por debajo de la barrera del **95%**.
-    
-    **2. El Sesgo (Bias):**
-    Es el error matemático sistemático de una métrica. Se calcula restando el valor real poblacional a lo que la métrica ha estimado con la muestra ($Bias = \\mu_{muestra} - \\mu_{poblacion}$).
-    * **Un sesgo de 0.0000 (Línea central):** Es el ideal termodinámico. Significa que la métrica es un "francotirador" analítico perfecto; sus disparos son siempre limpios y no se deja engañar por el ruido de la muestra.
-    * **Un sesgo positivo (ej. +0.15):** Indica que la métrica es *falsamente optimista*. Ante la falta de varianza (por ejemplo, cuando todos los jueces coinciden en la misma categoría), la métrica clásica "infla" artificialmente el resultado, diciendo que existe más consenso del que matemáticamente hay.
-    * **Un sesgo negativo (ej. -0.15):** Indica que la métrica es *falsamente pesimista*. El estimador está castigando injustamente a los evaluadores y devolviendo una fiabilidad menor a la que realmente demostraron empíricamente.
-    """)
+    st.write("Herramientas avanzadas para auditar la honestidad matemática de los estimadores.")
 
     st.markdown("---")
     st.markdown("### ⚔️ 7. Guía del Duelo de Titanes (N vs. Clásicos - Pestaña 6)")
-    st.write("Esta pestaña es un **laboratorio de estrés estadístico** diseñado para auditar la precisión de las métricas en condiciones críticas de Inteligencia Artificial. Aquí se enfrenta el **Marco Termodinámico N** contra los estándares actuales (Alfa de Krippendorff, Fleiss, ICC).")
-    
-    st.markdown("#### ⚖️ Transparencia Epistemológica: ¿Está el duelo amañado?")
-    st.write("Una duda científica legítima es preguntarse si evaluar a los estimadores clásicos sobre universos generados por el motor termodinámico de N supone una ventaja injusta ('jugar con las reglas de N'). **La respuesta matemática es no.**")
-    st.write("El espacio de configuración no es una invención geométrica propia, sino la aplicación estricta de la **Teoría de la Probabilidad Discreta (Combinatoria Pura)**. La estadística clásica del siglo XX, por limitaciones computacionales, adopted aproximaciones asintóticas (basadas en la varianza) asumiendo que los datos siempre tenderían a una distribución normal. Cuando este simulador construye una matriz masiva basada en probabilidades combinatorias exactas y se la entrega a Krippendorff, le está proporcionando el ecosistema empírico perfecto. Si el coeficiente clásico falla al evaluar ese universo infinito, demuestra que su aproximación algebraica original contiene un **sesgo estructural (Bias)** ineludible, validando que el error no proviene de 'las reglas del juego', sino de la métrica misma.")
-    
-    st.markdown("#### 🧪 Descripción de los Experimentos")
-    st.markdown("""
-    1. **Paradoja de la Varianza Cero (Techo de Escala)**
-       * **Objetivo:** Evaluar el comportamiento cuando existe un acuerdo casi total en una sola categoría.
-       * **Dinámica:** Se genera una matriz donde los jueces coinciden masivamente. La estadística clásica suele colapsar (Bias alto) al no encontrar "varianza" que procesar.
-       * **Dimensiones:** Sujetos ($n$) y Jueces ($m$) moderados, con un objetivo de concordancia ($target\\_N$) > 0.9.
-    
-    2. **Estabilidad en Muestras Pequeñas (Expertos)**
-       * **Objetivo:** Simular auditorías de alta especialización (médica/legal) con muy pocos evaluadores.
-       * **Dinámica:** Se fuerza un escenario de $n < 10$ y $m$ entre 2 y 3. Demuestra si la métrica es capaz de extraer la "verdad" con recursos mínimos sin sesgarse.
-       * **Dimensiones:** $n$ muy pequeño, $m$ mínimo, Escala $k$ completa.
-    
-    3. **Ruido y Dispersión (Entropía Máxima)**
-       * **Objetivo:** Medir la capacidad de la métrica para identificar el caos.
-       * **Dinámica:** Se genera una matriz de votos altamente discrepantes. Comprueba si los estimadores clásicos arrojan "falsos positivos" de consenso al ser engañados por el ruido.
-       * **Dimensiones:** $n$ y $m$ estándar, $target\\_N$ bajo (< 0.3).
-    
-    4. **Gran Escala (Stress Test Big Data)**
-       * **Objetivo:** Validar la consistencia asintótica para Inteligencia Artificial.
-       * **Dinámica:** Proyecta el comportamiento de la métrica hacia miles de registros. Busca detectar si el error intrínseco desaparece con el volumen, o si arrastra un sesgo sistemático permanente.
-       * **Dimensiones:** $n \\to 1500$, $m$ variable.
-    """)
-    
-    st.markdown("#### 📊 Glosario de Métricas de Auditoría")
-    st.write("Para demostrar la superioridad matemática de un método, el simulador observa dos indicadores clave durante el combate:")
-    st.markdown("""
-    * **Precisión (MSE - Error Cuadrático Medio):** Es la métrica de precisión por excelencia en IA. Mide cuánto se aleja el disparo del estimador de la Verdad Poblacional exacta. **Cuanto más bajo (cerca de 0.0000), mejor.**
-    * **Sesgo (Bias):** Indica si la métrica tiene un "prejuicio matemático" que le hace tender a sobrestimar (positivo) o subestimar (negativo) el consenso real de forma sistemática. El valor perfecto de un estimador honesto es **0.0000**.
-    """)
+    st.write("Esta pestaña es un laboratorio de estrés estadístico para auditar la precisión en condiciones críticas de Inteligencia Artificial.")
 
     st.markdown("---")
     st.markdown("### 🧬 8. Análisis de Clases de Equivalencia y Base de Datos (Pestaña 7)")
-    st.write("Esta sección actúa como el **escáner del espacio de fases** de la aplicación, abstrayendo la matriz de datos desde sus microestados individuales hasta sus propiedades combinatorias globales.")
-    
-    st.markdown("""
-    * **Deducción de Dimensiones del Sistema ($k, m$):**
-        * **$m$ (Evaluadores/Items):** Corresponde a la longitud de los vectores de respuesta (columnas procesadas).
-        * **$k$ (Categorías Activas):** Es el número de niveles o etiquetas categóricas distintas presentes en los vectores.
-    
-    * **Abstracción de Microestados a Firmas (Clases de Equivalencia):**
-        * Un **Microestado** es la secuencia ordenada de respuestas de un sujeto (ej. `(1, 1, 1, 2)`).
-        * Una **Firma / Clase de Equivalencia** es el perfil de frecuencias de categorías ordenado de forma decreciente (partición de $m$).
-        * Permite reconocer que dos vectores permutados, como `(1, 1, 1, 2)` y `(2, 2, 2, 1)`, pertenecen exactamente a la misma firma `(3, 1)`, reflejando la misma estructura interna de acuerdo/desacuerdo.
-    
-    * **Multiplicidad vs. Frecuencia Acumulada ($n$):**
-        * **Multiplicidad Observada:** Número de microestados (vectores únicos) distintos que pertenecen a una firma dada en la muestra.
-        * **Frecuencia Acumulada ($n$):** Suma total de observaciones empíricas asociadas a todos los microestados de esa firma.
-        * *Nota sobre Espacios Grandes ($m > 50$):* En muestras con un número de evaluadores elevado (ej. $m = 137$), el hiperespacio posible ($k^m$) es astronómico. Por ello, la frecuencia individual de cada microestado suele ser igual a 1, haciendo coincidir numéricamente la multiplicidad observada con la frecuencia acumulada.
-    
-    * **Gestión de Persistencia Local (`diccionarios_estados.json`):**
-        * **Diccionario Activo en Memoria:** Muestra la estructura de la matriz cargada actualmente en la sesión de trabajo (`st.session_state`).
-        * **Base de Datos Acumulada:** Repositorio persistente alojado en disco (`.json`). Registra e inspecciona ejecuciones y datasets históricos procesados previamente. Incluye opción de descarga directa en formato JSON sanitizado para su auditoría técnica externa.
-    """)
+    st.write("Escáner del espacio de fases de la aplicación, abstrayendo la matriz desde sus microestados hacia sus firmas combinatorias.")
+
 # ==============================================================================
 # PESTAÑA 9: AUTORÍA Y LICENCIA
 # ==============================================================================
