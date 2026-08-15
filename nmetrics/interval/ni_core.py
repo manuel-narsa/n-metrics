@@ -13,88 +13,75 @@ import streamlit as st
 # ==============================================================================
 # ACCESO A CACHÉ Y GENERACIÓN DE MACROESTADOS NI
 # ==============================================================================
-@st.cache_data(ttl=3600)  # Evita relecturas de disco en la misma sesión
+@st.cache_data(ttl=3600)  
 def get_macrostate_dictionary_ni(m_jueces: int, k_escala: int):
-  """Recupera el diccionario de macroestados desde n_metrics_cache.db.
+    """
+    Recupera el diccionario de macroestados desde n_metrics_cache.db con control 
+    explícito de errores para evitar fallos silenciosos.
+    """
+    try:
+        conn = sqlite3.connect("n_metrics_cache.db")
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT data_json FROM macroestados_cache WHERE metrica=? AND m=? AND k=?",
+            ("NI", m_jueces, k_escala)
+        )
+        row = cursor.fetchone()
+        conn.close()
 
-  Si la base de datos no existe o no tiene los parámetros (m, k), utiliza el
-  fallback algorítmico `_build_macrostate_dictionary`.
-  """
-  try:
-    conn = sqlite3.connect("n_metrics_cache.db")
-    cursor = conn.cursor()
-    cursor.execute(
-        "SELECT data_json FROM macroestados_cache WHERE metrica=? AND m=? AND"
-        " k=?",
-        ("NI", m_jueces, k_escala),
-    )
-    row = cursor.fetchone()
-    conn.close()
+        if row:
+            data = json.loads(row[0])
+            return {float(k): v for k, v in data.items()}
+        else:
+            # Esto te avisa en pantalla si SQLite no tiene el registro exacto
+            st.warning(f"⚠️ SQLite no encontró m={m_jueces}, k={k_escala}. Usando fallback algorítmico.")
+    except Exception as e:
+        # Esto te muestra si la base de datos falló por bloqueos o rutas
+        st.error(f"❌ Error crítico leyendo SQLite: {e}")
 
-    if row:
-      # Reconstrucción instantánea desde SQLite
-      data = json.loads(row[0])
-      return {float(k): v for k, v in data.items()}
-  except Exception:
-    pass  # Si la BD no existe o falla la lectura, pasa al fallback
-
-  # Fallback: Cálculo en vivo mediante la vía de las formas ancladas
-  return _build_macrostate_dictionary(m_jueces, k_escala)
+    # Fallback si no existe en la BD o falla la lectura
+    return _build_macrostate_dictionary(m_jueces, k_escala)
 
 
-@lru_cache(maxsize=128)
+# SE ELIMINÓ EL DECORADOR @lru_cache(maxsize=128) AQUÍ PARA LIBERAR RAM
 def _build_macrostate_dictionary(m_jueces: int, k_escala: int):
-  """Algoritmo de fallback: Genera la distribución de macroestados mediante
+    """Generador algorítmico de macroestados mediante Formas Ancladas."""
+    fact = [math.factorial(i) for i in range(m_jueces + 1)]
 
-  Formas Ancladas (Invarianza por translación).
-  """
-  fact = [math.factorial(i) for i in range(m_jueces + 1)]
+    n_ext1 = m_jueces // 2
+    n_ext2 = m_jueces - n_ext1
+    mean_ext = (n_ext1 * 1 + n_ext2 * k_escala) / m_jueces
+    var_ext = (n_ext1 * (1 - mean_ext)**2 + n_ext2 * (k_escala - mean_ext)**2) / m_jueces
+    max_sigma = math.sqrt(var_ext)
 
-  # 1. Definimos límites físicos para normalizar sigma
-  n_ext1 = m_jueces // 2
-  n_ext2 = m_jueces - n_ext1
-  mean_ext = (n_ext1 * 1 + n_ext2 * k_escala) / m_jueces
-  var_ext = (
-      n_ext1 * (1 - mean_ext) ** 2 + n_ext2 * (k_escala - mean_ext) ** 2
-  ) / m_jueces
-  max_sigma = math.sqrt(var_ext)
+    macro_dict = defaultdict(float)
+    formas_resto = itertools.combinations_with_replacement(range(k_escala), m_jueces - 1)
 
-  macro_dict = defaultdict(float)
+    for resto in formas_resto:
+        forma = (0,) + resto
+        max_val = forma[-1]
+        desplazamientos = k_escala - max_val
 
-  # 2. Generamos solo Formas Ancladas: el primer voto siempre es 0.
-  formas_resto = itertools.combinations_with_replacement(
-      range(k_escala), m_jueces - 1
-  )
+        s1 = sum(forma)
+        s2 = sum(x * x for x in forma)
+        variance = (s2 / m_jueces) - (s1 / m_jueces)**2
+        sigma = math.sqrt(max(0, variance))
 
-  # 3. Bucle Optimizado
-  for resto in formas_resto:
-    forma = (0,) + resto
+        acuerdo = max(0.0, 1.0 - (sigma / max_sigma))
+        acuerdo_key = round(acuerdo, 8)
 
-    max_val = forma[-1]
-    desplazamientos = k_escala - max_val
+        counts = {}
+        for x in forma:
+            counts[x] = counts.get(x, 0) + 1
 
-    # Cálculo de sigma (Varianza inalterable al desplazamiento)
-    s1 = sum(forma)
-    s2 = sum(x * x for x in forma)
-    variance = (s2 / m_jueces) - (s1 / m_jueces) ** 2
-    sigma = math.sqrt(max(0, variance))
+        denom = 1.0
+        for c in counts.values():
+            denom *= fact[c]
 
-    acuerdo = max(0.0, 1.0 - (sigma / max_sigma))
-    acuerdo_key = round(acuerdo, 8)
+        multiplicidad_base = fact[m_jueces] / denom
+        macro_dict[acuerdo_key] += multiplicidad_base * desplazamientos
 
-    # Multiplicidad de la forma anclada
-    counts = {}
-    for x in forma:
-      counts[x] = counts.get(x, 0) + 1
-
-    denom = 1.0
-    for c in counts.values():
-      denom *= fact[c]
-
-    multiplicidad_base = fact[m_jueces] / denom
-    macro_dict[acuerdo_key] += multiplicidad_base * desplazamientos
-
-  return dict(macro_dict)
+    return dict(macro_dict)
 
 
 # ==============================================================================
