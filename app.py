@@ -104,7 +104,16 @@ def guardar_base_diccionarios(base_dict, filepath=DB_DICCIONARIOS_PATH):
 # ==============================================================================
 # MOTOR DE INFERENCIA DE UI 
 # ==============================================================================
+
 def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estimadores, m_jueces, n_total, matriz_np):
+    # --- DEBUG INVISIBLE ---
+    # Verifica qué está llegando realmente antes de decidir si calcular
+    if dict_estados is None:
+        st.error("DEBUG: dict_estados es None")
+    elif len(dict_estados) == 0:
+        st.error("DEBUG: dict_estados está vacío")
+    else:
+        st.success(f"DEBUG: dict_estados tiene {len(dict_estados)} elementos. Claves disponibles: {list(dict_estados.keys())[:5]}...")
     """Enrutador principal de cálculos que alimenta las tablas de la interfaz."""
     resultados_inf = []
     
