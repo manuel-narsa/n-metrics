@@ -101,6 +101,9 @@ def guardar_base_diccionarios(base_dict, filepath=DB_DICCIONARIOS_PATH):
 # ==============================================================================
 # MOTOR DE INFERENCIA DE UI 
 # ==============================================================================
+# ==============================================================================
+# MOTOR DE INFERENCIA DE UI 
+# ==============================================================================
 def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estimadores, m_jueces, n_total, matriz_np):
     """Enrutador principal de cálculos que alimenta las tablas de la interfaz."""
     resultados_inf = []
@@ -108,15 +111,25 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
     # --- A. MOTOR UNIFICADO: NI (Intervalar) ---
     if "Intervalar" in topologia and "NI (Marco N)" in estimadores:
         try:
-            ni_muestra, pob_real, inf, sup = ni_core.calcular_estadisticas_ni_unificada(dict_estados, k_calc, replicas)
-            p_e = ni_core.calcular_azar_termodinamico_ni(m_jueces, k_calc)
-            perc = ni_core.calcular_percentil_universal_ni(pob_real, m_jueces, k_calc)
+            # Envoltorio de estado visual para el proceso de 2 minutos
+            with st.status("Calculando Coeficiente NI...", expanded=True) as status:
+                st.write("Procesando matriz y masa entrópica en la nube (~5 minutos, dependiendo del valoir de m)...")
+                
+                # Llamadas intactas a tu librería ni_core
+                ni_muestra, pob_real, inf, sup = ni_core.calcular_estadisticas_ni_unificada(dict_estados, k_calc, replicas)
+                p_e = ni_core.calcular_azar_termodinamico_ni(m_jueces, k_calc)
+                perc = ni_core.calcular_percentil_universal_ni(pob_real, m_jueces, k_calc)
+                
+                # Actualización del cuadro al terminar el cálculo
+                status.update(label="¡Cálculo NI completado con éxito!", state="complete", expanded=False)
+
             resultados_inf.append({
                 "Métrica": "NI", "Muestra": ni_muestra, "Pob. Real": pob_real, 
                 "IC Inf": inf, "IC Sup": sup, "Ancho IC": sup - inf,
                 "Valor Azar": p_e, "Percentil (%)": perc, "Motor": "Simulación Ponderada"
             })
-        except Exception as e: st.warning(f"⚠️ El motor NI falló: {e}")
+        except Exception as e: 
+            st.warning(f"⚠️ El motor NI falló: {e}")
 
     # --- B. MOTOR UNIFICADO: NN (Nominal) ---
     elif "Nominal" in topologia and "NN (Marco N)" in estimadores:
