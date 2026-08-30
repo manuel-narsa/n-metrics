@@ -1160,11 +1160,14 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
     st.write("") 
     
-    col1, col2, col3 = st.columns([1, 1, 1])
+    col1, col2 = st.columns([1, 1])
+    #col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        st.video("https://youtu.be/mHQekxmCxH4")
+        st.video("https://youtu.be/lbdqjTblE44")
+        #st.video("https://youtu.be/mHQekxmCxH4")
+        #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
         
-    with col3:
+    with col2:
         st.write(""); st.write(""); st.write(""); st.write("")
         st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
@@ -1187,8 +1190,8 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
             
         st.markdown("</div>", unsafe_allow_html=True)
         
-    with col2:
-        st.video("https://youtu.be/BjfPvSKJeXA")
+    #with col2:
+    #    st.video("https://youtu.be/BjfPvSKJeXA")
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
