@@ -1369,6 +1369,6 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
   author={Narbona Sarria, Manuel},
   journal={Preprint},
   year={2026},
-  url={https://doi.org/10.5281/zenodo.20075068}
+  url={https://doi.org/10.5281/zenodo.22736297}
   url={http://dx.doi.org/10.2139/ssrn.7119419}
 }""", language="bibtex")
