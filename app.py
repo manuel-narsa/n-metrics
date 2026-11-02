@@ -351,35 +351,55 @@ try:
 except Exception:
     pass
     
-# ==============================================================================
-# INICIO MODO DOBLE CIEGO
-# ==============================================================================
-DOUBLE_BLIND = True
 
-if DOUBLE_BLIND:
-    st.markdown("""
+# Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+st.markdown(
+    """
     <style>
-
-    /* Oculta botones Fork, GitHub y menú superior */
-    [data-testid="stHeaderActionElements"]{
-        display:none !important;
+    /* 1. Ocultar el botón flotante de estado en la esquina inferior derecha */
+    [data-testid="stStatusWidget"] {
+        visibility: hidden;
+        display: none;
     }
-
-    /* Menú hamburguesa */
-    #MainMenu{
-        visibility:hidden;
+    
+    /* 2. Ocultar la barra de herramientas superior derecha (GitHub, Fork, etc.) */
+    [data-testid="stToolbar"] {
+        visibility: hidden;
+        display: none;
     }
-
-    /* Footer */
-    footer{
-        visibility:hidden;
-    }
-
     </style>
-    """, unsafe_allow_html=True)    
-# ==============================================================================
-# FIN MODO DOBLE CIEGO
-# ==============================================================================
+    """,
+    unsafe_allow_html=True
+)
+# # ==============================================================================
+# # INICIO MODO DOBLE CIEGO
+# # ==============================================================================
+# DOUBLE_BLIND = True
+
+# if DOUBLE_BLIND:
+    # st.markdown("""
+    # <style>
+
+    # /* Oculta botones Fork, GitHub y menú superior */
+    # [data-testid="stHeaderActionElements"]{
+        # display:none !important;
+    # }
+
+    # /* Menú hamburguesa */
+    # #MainMenu{
+        # visibility:hidden;
+    # }
+
+    # /* Footer */
+    # footer{
+        # visibility:hidden;
+    # }
+
+    # </style>
+    # """, unsafe_allow_html=True)    
+# # ==============================================================================
+# # FIN MODO DOBLE CIEGO
+# # ==============================================================================
 
 st.markdown("""
     <style>
