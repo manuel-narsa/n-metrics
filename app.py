@@ -350,7 +350,7 @@ try:
         st.set_page_config(page_title="Métricas N: Termodinámica del Consenso", layout="wide")
 except Exception:
     pass
-    
+import streamlit as st
 
 # Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown(
@@ -371,36 +371,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-# # ==============================================================================
-# # INICIO MODO DOBLE CIEGO
-# # ==============================================================================
-# DOUBLE_BLIND = True
-
-# if DOUBLE_BLIND:
-    # st.markdown("""
-    # <style>
-
-    # /* Oculta botones Fork, GitHub y menú superior */
-    # [data-testid="stHeaderActionElements"]{
-        # display:none !important;
-    # }
-
-    # /* Menú hamburguesa */
-    # #MainMenu{
-        # visibility:hidden;
-    # }
-
-    # /* Footer */
-    # footer{
-        # visibility:hidden;
-    # }
-
-    # </style>
-    # """, unsafe_allow_html=True)    
-# # ==============================================================================
-# # FIN MODO DOBLE CIEGO
-# # ==============================================================================
-
+# Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
         .block-container { padding-bottom: 10rem !important; }
@@ -561,25 +532,18 @@ with col_logo:
 with col_titulo:
     st.markdown('<h1 style="margin-top: 0rem; padding-top: 0rem;">Métricas N: La Termodinámica del Consenso</h1>', unsafe_allow_html=True)
 st.markdown("Plataforma oficial para la inferencia termodinámica, auditoría topológica y procesamiento a escala de Big Data de matrices empíricas.")
-#
-#INICIO DOBLE CIEGO
-#
-opciones_pestañas = [
-    "📊 Cálculo del Consenso",
-    "🎯 Pruebas de Cobertura",
-    "📈 Informe Multirrango",
-    "🔄 Invarianza (n) y Sensibilidad (m)",
-    "🏗️ Generador de Matrices",
-    "⚔️ Duelo: N vs Clásicos",
-    "📚 BD Diccionarios",
-    "📖 Manual de Usuario"
-]
 
-if not DOUBLE_BLIND:
-    opciones_pestañas.append("📜 Autoría y Licencia")
-#
-#FIN DOBLE CIEGO
-#
+opciones_pestañas = [
+    "📊 Cálculo del Consenso", 
+    "🎯 Pruebas de Cobertura", 
+    "📈 Informe Multirrango", 
+    "🔄 Invarianza (n) y Sensibilidad (m)", 
+    "🏗️ Generador de Matrices", 
+    "⚔️ Duelo: N vs Clásicos", 
+    "📚 BD Diccionarios",
+    "📖 Manual de Usuario", 
+    "📜 Autoría y Licencia"
+]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
 if pestaña_seleccionada != st.session_state["pestaña_activa"]:
@@ -1215,40 +1179,40 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 # PESTAÑA 8: MANUAL DE USUARIO
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
-    # st.write("") 
+    st.write("") 
     
-    # col1, col2 = st.columns([1, 1])
-    # #col1, col2, col3 = st.columns([1, 1, 1])
-    # with col1:
-        # st.video("https://youtu.be/lbdqjTblE44")
-        # #st.video("https://youtu.be/mHQekxmCxH4")
-        # #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
+    col1, col2 = st.columns([1, 1])
+    #col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.video("https://youtu.be/lbdqjTblE44")
+        #st.video("https://youtu.be/mHQekxmCxH4")
+        #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
         
-    # with col2:
-        # st.write(""); st.write(""); st.write(""); st.write("")
-        # st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    with col2:
+        st.write(""); st.write(""); st.write(""); st.write("")
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
-        # base_dir = os.path.abspath(os.path.dirname(__file__))
-        # pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
         
-        # if os.path.exists(pdf_path):
-            # with open(pdf_path, "rb") as pdf_file:
-                # st.download_button(
-                    # label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
-                    # data=pdf_file,
-                    # file_name="N-Metrics_Logic_Blueprint.pdf",
-                    # mime="application/pdf",
-                    # width='stretch'
-                # )
-        # else:
-            # st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
-            # st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
-            # st.markdown("</div>", unsafe_allow_html=True)
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as pdf_file:
+                st.download_button(
+                    label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
+                    data=pdf_file,
+                    file_name="N-Metrics_Logic_Blueprint.pdf",
+                    mime="application/pdf",
+                    width='stretch'
+                )
+        else:
+            st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
+            st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
+            st.markdown("</div>", unsafe_allow_html=True)
             
-        # st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         
-    # #with col2:
-    # #    st.video("https://youtu.be/BjfPvSKJeXA")
+    #with col2:
+    #    st.video("https://youtu.be/BjfPvSKJeXA")
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
@@ -1393,12 +1357,7 @@ elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
 # ==============================================================================
 # PESTAÑA 9: AUTORÍA Y LICENCIA
 # ==============================================================================
-#INICIO DOBLE CIEGO
-elif (
-    not DOUBLE_BLIND
-    and st.session_state["pestaña_activa"] == '📜 Autoría y Licencia'
-):
-#INICIO DOBLE CIEGO
+elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
     st.markdown("### Código Abierto y Transparencia")
     st.write("El Marco Termodinámico $N$ es un proyecto de ciencia abierta creado por Manuel Narbona Sarria.")
     
