@@ -350,28 +350,7 @@ try:
         st.set_page_config(page_title="Métricas N: Termodinámica del Consenso", layout="wide")
 except Exception:
     pass
-import streamlit as st
 
-# Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
-st.markdown(
-    """
-    <style>
-    /* 1. Ocultar el botón flotante de estado en la esquina inferior derecha */
-    [data-testid="stStatusWidget"] {
-        visibility: hidden;
-        display: none;
-    }
-    
-    /* 2. Ocultar la barra de herramientas superior derecha (GitHub, Fork, etc.) */
-    [data-testid="stToolbar"] {
-        visibility: hidden;
-        display: none;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-# Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
         .block-container { padding-bottom: 10rem !important; }
@@ -541,8 +520,8 @@ opciones_pestañas = [
     "🏗️ Generador de Matrices", 
     "⚔️ Duelo: N vs Clásicos", 
     "📚 BD Diccionarios",
-    "📖 Manual de Usuario", 
-    "📜 Autoría y Licencia"
+    "📖 Manual de Usuario"#, 
+#    "📜 Autoría y Licencia"
 ]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
@@ -1179,40 +1158,40 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 # PESTAÑA 8: MANUAL DE USUARIO
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
-    st.write("") 
+    # st.write("") 
     
-    col1, col2 = st.columns([1, 1])
-    #col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        st.video("https://youtu.be/lbdqjTblE44")
-        #st.video("https://youtu.be/mHQekxmCxH4")
-        #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
+    # col1, col2 = st.columns([1, 1])
+    # #col1, col2, col3 = st.columns([1, 1, 1])
+    # with col1:
+        # st.video("https://youtu.be/lbdqjTblE44")
+        # #st.video("https://youtu.be/mHQekxmCxH4")
+        # #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
         
-    with col2:
-        st.write(""); st.write(""); st.write(""); st.write("")
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    # with col2:
+        # st.write(""); st.write(""); st.write(""); st.write("")
+        # st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
-        base_dir = os.path.abspath(os.path.dirname(__file__))
-        pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
+        # base_dir = os.path.abspath(os.path.dirname(__file__))
+        # pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
         
-        if os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as pdf_file:
-                st.download_button(
-                    label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
-                    data=pdf_file,
-                    file_name="N-Metrics_Logic_Blueprint.pdf",
-                    mime="application/pdf",
-                    width='stretch'
-                )
-        else:
-            st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
-            st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
-            st.markdown("</div>", unsafe_allow_html=True)
+        # if os.path.exists(pdf_path):
+            # with open(pdf_path, "rb") as pdf_file:
+                # st.download_button(
+                    # label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
+                    # data=pdf_file,
+                    # file_name="N-Metrics_Logic_Blueprint.pdf",
+                    # mime="application/pdf",
+                    # width='stretch'
+                # )
+        # else:
+            # st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
+            # st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
+            # st.markdown("</div>", unsafe_allow_html=True)
             
-        st.markdown("</div>", unsafe_allow_html=True)
+        # st.markdown("</div>", unsafe_allow_html=True)
         
-    #with col2:
-    #    st.video("https://youtu.be/BjfPvSKJeXA")
+    # #with col2:
+    # #    st.video("https://youtu.be/BjfPvSKJeXA")
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
     st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
