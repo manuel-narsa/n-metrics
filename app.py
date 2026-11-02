@@ -351,6 +351,26 @@ try:
 except Exception:
     pass
 
+# Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+st.markdown(
+    """
+    <style>
+    /* 1. Ocultar el botón flotante de estado en la esquina inferior derecha */
+    [data-testid="stStatusWidget"] {
+        visibility: hidden;
+        display: none;
+    }
+    
+    /* 2. Ocultar la barra de herramientas superior derecha (GitHub, Fork, etc.) */
+    [data-testid="stToolbar"] {
+        visibility: hidden;
+        display: none;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
         .block-container { padding-bottom: 10rem !important; }
