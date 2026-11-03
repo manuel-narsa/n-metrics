@@ -352,18 +352,18 @@ except Exception:
     pass
 
 # Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
-import streamlit as st
 
-import streamlit as st
+# Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 
 st.markdown(
     """
     <style>
-    /* Ocultar botones de pantalla completa, barras flotantes y avatares de autoría */
-    button[title*="fullscreen" i],
-    button[aria-label*="fullscreen" i],
-    [data-testid="stElementToolbar"],
+    /* Ocultar de forma agresiva cualquier barra de herramientas o botón de pantalla completa */
+    div[data-testid="stElementToolbar"],
+    div[data-testid="stDecoration"],
     [data-testid="stStatusWidget"],
+    button[title*="View fullscreen"],
+    button[kind="header-no-border"],
     .stFullScreenButton,
     footer,
     header[data-testid="stHeader"] {
@@ -375,17 +375,29 @@ st.markdown(
     </style>
 
     <script>
-    // Script auxiliar para eliminar dinámicamente cualquier elemento flotante de Streamlit Cloud
-    const ocultarElementos = () => {
-        const elementos = document.querySelectorAll('button[title*="fullscreen"], [data-testid="stStatusWidget"], [data-testid="stElementToolbar"]');
-        elementos.forEach(el => el.remove());
+    // Script avanzado para purgar el botón de pantalla completa del DOM de Streamlit Cloud
+    const purgarBotones = () => {
+        // Buscar botones por título o icono de maximizar/pantalla completa
+        const botones = document.querySelectorAll('button');
+        botones.forEach(btn => {
+            const label = btn.getAttribute('aria-label') || '';
+            const title = btn.getAttribute('title') || '';
+            if (title.toLowerCase().includes('fullscreen') || label.toLowerCase().includes('fullscreen') || title.toLowerCase().includes('pantalla')) {
+                btn.remove();
+            }
+        });
+        
+        // Eliminar toolbars flotantes
+        document.querySelectorAll('[data-testid="stElementToolbar"]').forEach(el => el.remove());
+        document.querySelectorAll('[data-testid="stStatusWidget"]').forEach(el => el.remove());
     };
-    setInterval(ocultarElementos, 500);
+    
+    setInterval(purgarBotones, 300);
     </script>
     """,
     unsafe_allow_html=True
 )
-# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
         .block-container { padding-bottom: 10rem !important; }
