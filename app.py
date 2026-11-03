@@ -352,19 +352,27 @@ except Exception:
     pass
 
 # Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+
 st.markdown(
     """
     <style>
-    /* 1. Ocultar el botón flotante de estado en la esquina inferior derecha */
-    [data-testid="stStatusWidget"] {
-        visibility: hidden;
-        display: none;
+    /* 1. Ocultar el avatar/perfil flotante de la esquina inferior derecha */
+    [data-testid="stStatusWidget"],
+    .stAppViewer,
+    div[class*="viewerBadge"],
+    div[class*="Profile"],
+    div[class*="stConnectionStatus"] {
+        display: none !important;
+        visibility: hidden !important;
     }
     
-    /* 2. Ocultar la barra de herramientas superior derecha (GitHub, Fork, etc.) */
-    [data-testid="stToolbar"] {
-        visibility: hidden;
-        display: none;
+    /* 2. Ocultar el botón rojo 'Hosted with Streamlit' y la barra superior de GitHub/Fork */
+    [data-testid="stToolbar"],
+    header[data-testid="stHeader"],
+    #MainMenu,
+    footer {
+        display: none !important;
+        visibility: hidden !important;
     }
     </style>
     """,
