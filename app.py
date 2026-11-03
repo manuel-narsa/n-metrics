@@ -354,30 +354,34 @@ except Exception:
 # Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 import streamlit as st
 
+import streamlit as st
+
 st.markdown(
     """
     <style>
-    /* 1. Ocultar el pie de página ("Built with Streamlit") y distintivos */
-    footer {visibility: hidden !important; display: none !important;}
-    [data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
-    
-    /* 2. Ocultar de forma absoluta cualquier botón o control de Fullscreen */
+    /* Ocultar botones de pantalla completa, barras flotantes y avatares de autoría */
     button[title*="fullscreen" i],
     button[aria-label*="fullscreen" i],
     [data-testid="stElementToolbar"],
-    .stFullScreenButton {
+    [data-testid="stStatusWidget"],
+    .stFullScreenButton,
+    footer,
+    header[data-testid="stHeader"] {
+        display: none !important;
         visibility: hidden !important;
-        display: none !important;
-    }
-    
-    /* 3. Ocultar la barra superior y elementos flotantes del visor */
-    header[data-testid="stHeader"],
-    .stAppViewer, 
-    div[class*="viewerBadge"] {
-        visibility: hidden !important; 
-        display: none !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
     </style>
+
+    <script>
+    // Script auxiliar para eliminar dinámicamente cualquier elemento flotante de Streamlit Cloud
+    const ocultarElementos = () => {
+        const elementos = document.querySelectorAll('button[title*="fullscreen"], [data-testid="stStatusWidget"], [data-testid="stElementToolbar"]');
+        elementos.forEach(el => el.remove());
+    };
+    setInterval(ocultarElementos, 500);
+    </script>
     """,
     unsafe_allow_html=True
 )
