@@ -377,6 +377,28 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+st.markdown(
+    """
+    <style>
+    /* 1. Ocultar el pie de página ("Built with Streamlit") */
+    footer {visibility: hidden !important; display: none !important;}
+    
+    /* 2. Ocultar el widget de estado / icono verde de la esquina inferior derecha */
+    [data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
+    
+    /* 3. Ocultar el botón de Fullscreen flotante */
+    button[title="View fullscreen"] {visibility: hidden !important; display: none !important;}
+    
+    /* 4. Ocultar cualquier barra de herramientas o visor flotante de Streamlit Cloud */
+    .stAppViewer, div[class*="viewerBadge"] {visibility: hidden !important; display: none !important;}
+    
+    /* 5. Ocultar la cabecera superior si estuviera visible */
+    header[data-testid="stHeader"] {visibility: hidden !important; display: none !important;}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 # Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
