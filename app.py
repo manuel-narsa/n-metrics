@@ -369,10 +369,9 @@ st.markdown(
     /* 2. Ocultar el botón rojo 'Hosted with Streamlit' y la barra superior de GitHub/Fork */
     [data-testid="stToolbar"],
     header[data-testid="stHeader"],
-    #MainMenu,
-    footer {
-        display: none !important;
-        visibility: hidden !important;
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     }
     </style>
     """,
