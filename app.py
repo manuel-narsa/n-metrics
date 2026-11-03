@@ -352,23 +352,31 @@ except Exception:
     pass
 
 # Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+import streamlit as st
+
 st.markdown(
     """
     <style>
-    /* 1. Ocultar el pie de página ("Built with Streamlit") */
+    /* 1. Ocultar el pie de página ("Built with Streamlit") y distintivos */
     footer {visibility: hidden !important; display: none !important;}
-    
-    /* 2. Ocultar el widget de estado / icono verde de la esquina inferior derecha */
     [data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
     
-    /* 3. Ocultar el botón de Fullscreen flotante */
-    button[title="View fullscreen"] {visibility: hidden !important; display: none !important;}
+    /* 2. Ocultar de forma absoluta cualquier botón o control de Fullscreen */
+    button[title*="fullscreen" i],
+    button[aria-label*="fullscreen" i],
+    [data-testid="stElementToolbar"],
+    .stFullScreenButton {
+        visibility: hidden !important;
+        display: none !important;
+    }
     
-    /* 4. Ocultar cualquier barra de herramientas o visor flotante de Streamlit Cloud */
-    .stAppViewer, div[class*="viewerBadge"] {visibility: hidden !important; display: none !important;}
-    
-    /* 5. Ocultar la cabecera superior si estuviera visible */
-    header[data-testid="stHeader"] {visibility: hidden !important; display: none !important;}
+    /* 3. Ocultar la barra superior y elementos flotantes del visor */
+    header[data-testid="stHeader"],
+    .stAppViewer, 
+    div[class*="viewerBadge"] {
+        visibility: hidden !important; 
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True
