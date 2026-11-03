@@ -10,11 +10,6 @@ import plotly.express as px
 from PIL import Image
 from collections import Counter
 
-import krippendorff
-import pingouin as pg
-from statsmodels.stats.inter_rater import fleiss_kappa, aggregate_raters
-import ranky as rk
-
 # ==============================================================================
 # FIJAR RUTA PRINCIPAL 
 # ==============================================================================
@@ -272,7 +267,7 @@ def ejecutar_calculo_optimizado(dict_estados, topologia, k_calc, replicas, estim
         except Exception as e: st.warning(f"⚠️ El motor NO falló: {e}")
 
     # --- D. ESTIMADORES CLÁSICOS ---
-    if n_total <= 100000:
+    if n_total <= 50000:
         if "Intervalar" in topologia:
             if "AKI (Bootstrap C.)" in estimadores:
                 try:
@@ -355,18 +350,54 @@ try:
         st.set_page_config(page_title="Métricas N: Termodinámica del Consenso", layout="wide")
 except Exception:
     pass
-# ANÓNIMO. Ocultar el botón flotante de la esquina inferior derecha. ATENCIÓN
+
+# Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+
+# Inicio Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
+
 st.markdown(
     """
     <style>
-    [data-testid="stStatusWidget"] {
-        visibility: hidden;
-        display: none;
+    /* Ocultar de forma agresiva cualquier barra de herramientas o botón de pantalla completa */
+    div[data-testid="stElementToolbar"],
+    div[data-testid="stDecoration"],
+    [data-testid="stStatusWidget"],
+    button[title*="View fullscreen"],
+    button[kind="header-no-border"],
+    .stFullScreenButton,
+    footer,
+    header[data-testid="stHeader"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
     }
     </style>
+
+    <script>
+    // Script avanzado para purgar el botón de pantalla completa del DOM de Streamlit Cloud
+    const purgarBotones = () => {
+        // Buscar botones por título o icono de maximizar/pantalla completa
+        const botones = document.querySelectorAll('button');
+        botones.forEach(btn => {
+            const label = btn.getAttribute('aria-label') || '';
+            const title = btn.getAttribute('title') || '';
+            if (title.toLowerCase().includes('fullscreen') || label.toLowerCase().includes('fullscreen') || title.toLowerCase().includes('pantalla')) {
+                btn.remove();
+            }
+        });
+        
+        // Eliminar toolbars flotantes
+        document.querySelectorAll('[data-testid="stElementToolbar"]').forEach(el => el.remove());
+        document.querySelectorAll('[data-testid="stStatusWidget"]').forEach(el => el.remove());
+    };
+    
+    setInterval(purgarBotones, 300);
+    </script>
     """,
     unsafe_allow_html=True
 )
+# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego# Fin Ocultar elementos de autoría y enlaces a GitHub para revisión doble ciego
 st.markdown("""
     <style>
         .block-container { padding-bottom: 10rem !important; }
@@ -525,8 +556,8 @@ with col_logo:
     try: st.image("icono.png", width=60)
     except Exception: pass
 with col_titulo:
-   st.markdown('<h2 style="margin-top: 0rem; padding-top: 0rem;">El Marco N: El consenso como un estado en el espacio de configuración</h2>', unsafe_allow_html=True)
-#st.markdown("Plataforma oficial para la inferencia termodinámica, auditoría topológica y procesamiento a escala de Big Data de matrices empíricas.")
+    st.markdown('<h2 style="margin-top: 0rem; padding-top: 0rem;">El Marco N: El consenso como un estado en el espacio de configuración</h2>', unsafe_allow_html=True)
+#st.markdown("Plataforma oficial del Marco N: El consenso como un estado en el espacio de configuración")
 
 opciones_pestañas = [
     "📊 Cálculo del Consenso", 
@@ -534,11 +565,10 @@ opciones_pestañas = [
     "📈 Informe Multirrango", 
     "🔄 Invarianza (n) y Sensibilidad (m)", 
     "🏗️ Generador de Matrices", 
-    "📏 Comparación IC: N vs Alfa",
     "⚔️ Duelo: N vs Clásicos", 
     "📚 BD Diccionarios",
-    "📖 Manual de Usuario", 
-    "📜 Autoría y Licencia"
+    "📖 Manual de Usuario"#, 
+#    "📜 Autoría y Licencia"
 ]
 pestaña_seleccionada = st.radio("Navegación del sistema:", options=opciones_pestañas, horizontal=True, index=opciones_pestañas.index(st.session_state["pestaña_activa"]), label_visibility="collapsed")
 
@@ -1032,364 +1062,6 @@ elif st.session_state["pestaña_activa"] == '🏗️ Generador de Matrices':
                 st.rerun()
 
 # ==============================================================================
-# PESTAÑA NUEVA: COMPARACIÓN DE INTERVALOS DE CONFIANZA N vs ALFA
-# ==============================================================================
-elif st.session_state["pestaña_activa"] == '📏 Comparación IC: N vs Alfa':
-    st.markdown("### 📏 Comparación de Intervalos de Confianza: N vs Alfa de Krippendorff")
-    st.write(
-        "Auditoría empírica de la anchura de los intervalos de confianza (IC) generados "
-        "por el Marco N (Simulación Ponderada) frente al Alfa de Krippendorff con bootstrap "
-        "clásico. Se comparan valores puntuales, anchuras de IC y tiempos de cálculo en "
-        "distintos escenarios estructurales (n, m, k)."
-    )
-
-    # --------------------------------------------------------------------------
-    # GENERADOR DE DATOS SINTÉTICOS (intervalo)
-    # --------------------------------------------------------------------------
-    def _generar_datos_intervalo(n, m, k, acuerdo_latente, ruido=0.5, semilla=42):
-        """
-        Genera una matriz (n x m) con un nivel de 'acuerdo latente' controlado.
-
-        IMPORTANTE: 'acuerdo_latente' NO es el valor de N ni de Alfa.
-        Es un parámetro del proceso generador que controla cuánto se desvían
-        las respuestas de los evaluadores respecto a una verdad latente.
-        - acuerdo_latente = 1.0  → todos responden la verdad (acuerdo perfecto)
-        - acuerdo_latente = 0.0  → ruido máximo (caos)
-        """
-        rng = np.random.default_rng(semilla)
-        verdad = rng.uniform(1, k, size=n)
-        X = np.zeros((n, m), dtype=float)
-        for j in range(m):
-            base = verdad + rng.normal(0, ruido * (1 - acuerdo_latente), size=n)
-            X[:, j] = np.clip(base, 1, k)
-        return X
-
-    # --------------------------------------------------------------------------
-    # CONFIGURACIÓN DE PARÁMETROS DEL EXPERIMENTO
-    # --------------------------------------------------------------------------
-    st.markdown("#### 🎛️ Parámetros del experimento")
-
-    col_p1, col_p2, col_p3 = st.columns(3)
-
-    with col_p1:
-        st.markdown("**Dimensión n (sujetos)**")
-        n_min = st.number_input("n mínimo", 10, 5000, 200, 10, key="cmp_n_min")
-        n_max = st.number_input("n máximo", 10, 5000, 200, 10, key="cmp_n_max")
-        n_step = st.number_input("Paso n", 10, 1000, 100, 10, key="cmp_n_step")
-
-    with col_p2:
-        st.markdown("**Dimensión m (evaluadores)**")
-        m_min = st.number_input("m mínimo", 2, 100, 3, 1, key="cmp_m_min")
-        m_max = st.number_input("m máximo", 2, 100, 10, 1, key="cmp_m_max")
-        m_step = st.number_input("Paso m", 1, 20, 1, 1, key="cmp_m_step")
-
-    with col_p3:
-        st.markdown("**Dimensión k (categorías)**")
-        k_min = st.number_input("k mínimo", 2, 20, 5, 1, key="cmp_k_min")
-        k_max = st.number_input("k máximo", 2, 20, 5, 1, key="cmp_k_max")
-        k_step = st.number_input("Paso k", 1, 10, 1, 1, key="cmp_k_step")
-
-    col_p4, col_p5, col_p6 = st.columns(3)
-
-    with col_p4:
-        valores_acuerdo = st.multiselect(
-            "Acuerdo latente (parámetro del generador):",
-            [0.0, 0.25, 0.5, 0.75, 0.9, 0.98],
-            default=[0.5],
-            key="cmp_acuerdo"
-        )
-
-    with col_p5:
-        ruido_gen = st.slider(
-            "Ruido de generación",
-            0.1, 1.5, 0.5, 0.1,
-            key="cmp_ruido"
-        )
-
-    with col_p6:
-        S_replicas = st.slider(
-            "Réplicas de bootstrap (S)",
-            100, 2000, 500, 100,
-            key="cmp_S"
-        )
-
-    # --------------------------------------------------------------------------
-    # CONSTRUCCIÓN DE LA LISTA DE ESCENARIOS
-    # --------------------------------------------------------------------------
-    escenarios_disponibles = {}
-    for n in range(int(n_min), int(n_max) + 1, int(n_step)):
-        for m in range(int(m_min), int(m_max) + 1, int(m_step)):
-            for k in range(int(k_min), int(k_max) + 1, int(k_step)):
-                for cons in valores_acuerdo:
-                    nombre = f"n={n}, m={m}, k={k}, acuerdo={cons}"
-                    escenarios_disponibles[nombre] = (n, m, k, cons)
-
-    if not escenarios_disponibles:
-        st.warning("⚠️ No hay escenarios configurados. Ajusta los rangos en los parámetros.")
-        st.stop()
-
-    st.caption(
-        f"📋 **{len(escenarios_disponibles)} escenarios posibles** generados con los "
-        f"parámetros actuales. Selecciona los que quieras ejecutar "
-        f"(se recomienda ≤ 10 para no saturar)."
-    )
-
-    # Selección por defecto: los primeros 3
-    escenarios_sel = st.multiselect(
-        "Escenarios a ejecutar:",
-        list(escenarios_disponibles.keys()),
-        default=list(escenarios_disponibles.keys())[:min(3, len(escenarios_disponibles))],
-        key="cmp_escenarios_sel"
-    )
-
-    # --------------------------------------------------------------------------
-    # EJECUCIÓN
-    # --------------------------------------------------------------------------
-    if st.button(
-        "🔬 Ejecutar comparación",
-        type="primary",
-        disabled=not escenarios_sel,
-        key="cmp_btn_ejecutar"
-    ):
-        resultados = []
-        progreso = st.progress(0)
-        status = st.empty()
-
-        for idx, nombre_esc in enumerate(escenarios_sel):
-            n, m, k, cons = escenarios_disponibles[nombre_esc]
-            status.text(f"Procesando: {nombre_esc}  ({idx+1}/{len(escenarios_sel)})")
-
-            # Generar datos
-            X = _generar_datos_intervalo(n, m, k, cons, ruido=ruido_gen, semilla=42)
-
-            # --- Cálculo de N (Marco N) ---
-            t0 = time.perf_counter()
-            try:
-                df_tmp = pd.DataFrame(X)
-                df_tmp['_freq'] = 1
-                dict_estados = df_tmp.groupby(list(df_tmp.columns[:-1])).size().to_dict()
-
-                ni_m, ni_pob, ni_inf, ni_sup = ni_core.calcular_estadisticas_ni_unificada(
-                    dict_estados, k, replicas=S_replicas
-                )
-                ni_ancho = ni_sup - ni_inf
-            except Exception as e:
-                ni_m = ni_pob = ni_inf = ni_sup = ni_ancho = np.nan
-                st.warning(f"Error en N ({nombre_esc}): {e}")
-            t_N = time.perf_counter() - t0
-
-            # --- Cálculo de Alfa (aki_core validado) ---
-            t0 = time.perf_counter()
-            try:
-                resultado_alfa = aki_core.calcular_estadisticas_aki(X, S_replicas)
-                alfa_m = resultado_alfa['AKI Muestra']
-                alfa_inf = resultado_alfa['IC Inf']
-                alfa_sup = resultado_alfa['IC Sup']
-                alfa_ancho = alfa_sup - alfa_inf
-            except Exception as e:
-                alfa_m = alfa_inf = alfa_sup = alfa_ancho = np.nan
-                st.warning(f"Error en Alfa ({nombre_esc}): {e}")
-            t_A = time.perf_counter() - t0
-
-            resultados.append({
-                "Escenario": nombre_esc,
-                "n": n,
-                "m": m,
-                "k": k,
-                "Acuerdo latente (generador)": cons,
-                "N muestra": ni_m,
-                "N IC inf": ni_inf,
-                "N IC sup": ni_sup,
-                "N ancho": ni_ancho,
-                "Alfa muestra": alfa_m,
-                "Alfa IC inf": alfa_inf,
-                "Alfa IC sup": alfa_sup,
-                "Alfa ancho": alfa_ancho,
-                "Ratio anchos (Alfa/N)": (alfa_ancho / ni_ancho)
-                                          if (ni_ancho and ni_ancho > 0) else np.nan,
-                "t N (s)": t_N,
-                "t Alfa (s)": t_A,
-            })
-
-            progreso.progress((idx + 1) / len(escenarios_sel))
-
-        status.empty()
-        df_res = pd.DataFrame(resultados)
-        st.session_state['df_comp_ic'] = df_res
-        st.rerun()
-
-    # --------------------------------------------------------------------------
-    # VISUALIZACIÓN DE RESULTADOS
-    # --------------------------------------------------------------------------
-    if 'df_comp_ic' in st.session_state:
-        df_res = st.session_state['df_comp_ic']
-
-        st.success(f"✅ Comparación completada sobre {len(df_res)} escenarios.")
-
-        # --- Nota metodológica ---
-        with st.expander("ℹ️ Nota metodológica sobre el parámetro 'Acuerdo latente'", expanded=False):
-            st.markdown("""
-            La columna **"Acuerdo latente (generador)"** es un **parámetro del proceso
-            generador**, no el valor de ningún coeficiente. Controla cuánto se desvían
-            las respuestas de los evaluadores respecto a una verdad latente:
-            - **1.0** → todos responden la verdad (acuerdo perfecto).
-            - **0.0** → ruido máximo (caos).
-
-            El valor resultante de N o de Alfa **no coincide** con este parámetro:
-            cada coeficiente tiene su propia escala e interpretación. La comparación
-            se realiza sobre las mismas matrices empíricas generadas, no sobre la
-            coincidencia de los valores con el parámetro de entrada.
-            """)
-
-        # --- Tabla resumen ---
-        columnas_tabla = [
-            'Escenario', 'N muestra', 'N ancho',
-            'Alfa muestra', 'Alfa ancho',
-            'Ratio anchos (Alfa/N)',
-            't N (s)', 't Alfa (s)'
-        ]
-        columnas_presentes = [c for c in columnas_tabla if c in df_res.columns]
-
-        st.dataframe(
-            df_res[columnas_presentes].style.format({
-                "N muestra": "{:.4f}",
-                "N ancho": "{:.4f}",
-                "Alfa muestra": "{:.4f}",
-                "Alfa ancho": "{:.4f}",
-                "Ratio anchos (Alfa/N)": "{:.2f}",
-                "t N (s)": "{:.4f}",
-                "t Alfa (s)": "{:.3f}",
-            }),
-            width='stretch'
-        )
-
-        # --- Gráficos ---
-        import plotly.graph_objects as go
-
-        col_g1, col_g2 = st.columns(2)
-
-        with col_g1:
-            fig_ancho = go.Figure()
-            fig_ancho.add_trace(go.Bar(
-                name='N (Marco N)',
-                x=df_res['Escenario'], y=df_res['N ancho'],
-                marker_color='#00CC96',
-                text=df_res['N ancho'].round(4),
-                textposition='outside'
-            ))
-            fig_ancho.add_trace(go.Bar(
-                name='Alfa (Krippendorff)',
-                x=df_res['Escenario'], y=df_res['Alfa ancho'],
-                marker_color='#EF553B',
-                text=df_res['Alfa ancho'].round(4),
-                textposition='outside'
-            ))
-            fig_ancho.update_layout(
-                title="Anchura del IC (95%): N vs Alfa",
-                xaxis_tickangle=-45,
-                yaxis_title="Anchura",
-                barmode='group',
-                height=500,
-                legend=dict(orientation="h", y=1.1)
-            )
-            st.plotly_chart(fig_ancho, width='stretch')
-
-        with col_g2:
-            fig_val = go.Figure()
-            fig_val.add_trace(go.Scatter(
-                name='N muestra',
-                x=df_res['Escenario'], y=df_res['N muestra'],
-                mode='lines+markers',
-                line=dict(color='#00CC96', width=3),
-                marker=dict(size=10)
-            ))
-            fig_val.add_trace(go.Scatter(
-                name='Alfa muestra',
-                x=df_res['Escenario'], y=df_res['Alfa muestra'],
-                mode='lines+markers',
-                line=dict(color='#EF553B', width=3),
-                marker=dict(size=10)
-            ))
-            fig_val.update_layout(
-                title="Valor puntual del coeficiente",
-                xaxis_tickangle=-45,
-                yaxis_title="Valor",
-                height=500,
-                legend=dict(orientation="h", y=1.1)
-            )
-            st.plotly_chart(fig_val, width='stretch')
-
-        # --- Gráfico de ratio de anchos ---
-        st.markdown("#### 📊 Ganancia de precisión del Marco N")
-        fig_ratio = go.Figure()
-        fig_ratio.add_trace(go.Bar(
-            x=df_res['Escenario'],
-            y=df_res['Ratio anchos (Alfa/N)'],
-            marker_color='#636EFA',
-            text=df_res['Ratio anchos (Alfa/N)'].round(2),
-            textposition='outside'
-        ))
-        fig_ratio.add_hline(
-            y=1.0,
-            line_dash="dash",
-            line_color="gray",
-            annotation_text="Paridad (ratio = 1)"
-        )
-        fig_ratio.update_layout(
-            title="Ratio de anchura (Alfa / N). Valores > 1 indican mayor precisión de N.",
-            xaxis_tickangle=-45,
-            yaxis_title="Ratio",
-            height=400
-        )
-        st.plotly_chart(fig_ratio, width='stretch')
-
-        # --- Interpretación automática ---
-        st.markdown("---")
-        st.markdown("### 🧠 Interpretación automática")
-
-        ratios_validos = df_res['Ratio anchos (Alfa/N)'].dropna()
-        if len(ratios_validos) > 0:
-            ratio_medio = ratios_validos.mean()
-            ratio_max = ratios_validos.max()
-            esc_max = df_res.loc[
-                df_res['Ratio anchos (Alfa/N)'].idxmax(), 'Escenario'
-            ]
-
-            col_i1, col_i2, col_i3 = st.columns(3)
-            col_i1.metric("Ratio medio (Alfa / N)", f"{ratio_medio:.2f}×")
-            col_i2.metric("Ratio máximo", f"{ratio_max:.2f}×")
-            col_i3.metric("Escenario crítico", esc_max.split(",")[0])
-
-            st.info(
-                f"**Lectura del resultado:** En promedio, el IC del Alfa es "
-                f"**{ratio_medio:.2f}× más ancho** que el del Marco N. El peor caso "
-                f"({esc_max}) presenta una desventaja de **{ratio_max:.2f}×**. "
-                f"Esto cuantifica empíricamente la pérdida de precisión del bootstrap "
-                f"clásico frente a la Simulación Ponderada del Marco N."
-            )
-
-        # --- Tabla detallada expandible ---
-        with st.expander("📋 Ver tabla completa con todos los detalles", expanded=False):
-            st.dataframe(df_res, width='stretch')
-
-        # --- Descarga ---
-        csv_data = df_res.to_csv(index=False, sep=";").encode('utf-8')
-        col_d1, col_d2 = st.columns(2)
-        with col_d1:
-            st.download_button(
-                "📥 Descargar comparación (.csv)",
-                csv_data,
-                "comparacion_N_vs_Alfa.csv",
-                "text/csv",
-                type="primary",
-                width='stretch'
-            )
-        with col_d2:
-            if st.button("🗑️ Limpiar comparación", type="secondary", width='stretch'):
-                st.session_state.pop('df_comp_ic', None)
-                st.rerun()
-
-# ==============================================================================
 # PESTAÑA 6: DUELO DE PRECISIÓN N vs CLÁSICOS
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '⚔️ Duelo: N vs Clásicos':
@@ -1533,43 +1205,43 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 # PESTAÑA 8: MANUAL DE USUARIO
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
-    st.write("") 
+    # st.write("") 
     
-    col1, col2 = st.columns([1, 1])
-    #col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        st.video("https://youtu.be/lbdqjTblE44")
-        #st.video("https://youtu.be/mHQekxmCxH4")
-        #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
+    # col1, col2 = st.columns([1, 1])
+    # #col1, col2, col3 = st.columns([1, 1, 1])
+    # with col1:
+        # st.video("https://youtu.be/lbdqjTblE44")
+        # #st.video("https://youtu.be/mHQekxmCxH4")
+        # #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
         
-    with col2:
-        st.write(""); st.write(""); st.write(""); st.write("")
-        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+    # with col2:
+        # st.write(""); st.write(""); st.write(""); st.write("")
+        # st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
         
-        base_dir = os.path.abspath(os.path.dirname(__file__))
-        pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
+        # base_dir = os.path.abspath(os.path.dirname(__file__))
+        # pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
         
-        if os.path.exists(pdf_path):
-            with open(pdf_path, "rb") as pdf_file:
-                st.download_button(
-                    label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
-                    data=pdf_file,
-                    file_name="N-Metrics_Logic_Blueprint.pdf",
-                    mime="application/pdf",
-                    width='stretch'
-                )
-        else:
-            st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
-            st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
-            st.markdown("</div>", unsafe_allow_html=True)
+        # if os.path.exists(pdf_path):
+            # with open(pdf_path, "rb") as pdf_file:
+                # st.download_button(
+                    # label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
+                    # data=pdf_file,
+                    # file_name="N-Metrics_Logic_Blueprint.pdf",
+                    # mime="application/pdf",
+                    # width='stretch'
+                # )
+        # else:
+            # st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
+            # st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
+            # st.markdown("</div>", unsafe_allow_html=True)
             
-        st.markdown("</div>", unsafe_allow_html=True)
+        # st.markdown("</div>", unsafe_allow_html=True)
         
-    #with col2:
-    #    st.video("https://youtu.be/BjfPvSKJeXA")
+    # #with col2:
+    # #    st.video("https://youtu.be/BjfPvSKJeXA")
 
     st.markdown("## 📖 Manual de Usuario y Fundamentos Teóricos")
-    st.write("Bienvenido al entorno analítico de **El Marco N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
+    st.write("Bienvenido al entorno analítico de **Métricas N**. Esta plataforma permite evaluar el nivel de consenso real de matrices empíricas, superando las paradojas de los estimadores frecuentistas clásicos mediante la aplicación de la **Termodinámica Exacta de la Información**.")
     
     st.markdown("---")
     st.markdown("### 1. El Motor Termodinámico: El Valor Poblacional")
