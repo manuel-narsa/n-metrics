@@ -4,4 +4,4 @@ numpy
 scipy
 plotly
 Pillow
-n-metrics==0.8.5
+git+https://github.com/manuel-narsa/n-metrics.git@main#egg=n-metrics
