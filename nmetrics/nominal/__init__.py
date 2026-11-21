@@ -12,7 +12,7 @@ from .nn_core import (
     calcular_percentil_universal_nn
 )
 
-# 2. Importaciones del motor Alpha de Krippendorff Nominal (AKN)
+#2. Importaciones del motor Alpha de Krippendorff Nominal (AKN)
 from .akn_core import (
     calcular_estadisticas_akn,
     calcular_akn_poblacion_asintotica
