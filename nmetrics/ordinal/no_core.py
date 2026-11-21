@@ -7,45 +7,32 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-
 # ==============================================================================
 # ACCESO A CACHÉ Y GENERACIÓN DE MACROESTADOS NO
 # ==============================================================================
-@st.cache_data(ttl=3600)  # Evita relecturas de disco en la misma sesión
+@st.cache_data(ttl=3600)  
 def get_macrostate_dictionary_no(m_jueces: int, k_escala: int):
-  """Recupera el diccionario de macroestados NO desde n_metrics_cache.db.
-
-  Si la base de datos no existe o no tiene los parámetros (m, k), utiliza el
-  fallback algorítmico `_build_macrostate_dictionary_no`.
-  """
   try:
     conn = sqlite3.connect("n_metrics_cache.db")
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT data_json FROM macroestados_cache WHERE metrica=? AND m=? AND"
-        " k=?",
+        "SELECT data_json FROM macroestados_cache WHERE metrica=? AND m=? AND k=?",
         ("NO", m_jueces, k_escala),
     )
     row = cursor.fetchone()
     conn.close()
 
     if row:
-      # Reconstrucción instantánea de las claves como tuplas: "[3, 2]" -> (3, 2)
       data = json.loads(row[0])
       return {tuple(json.loads(k)): v for k, v in data.items()}
   except Exception:
-    pass  # Si la BD no existe o falla la lectura, pasa al fallback
+    pass
 
-  # Fallback: Cálculo en vivo
   return _build_macrostate_dictionary_no(m_jueces, k_escala)
-
 
 @lru_cache(maxsize=128)
 def _build_macrostate_dictionary_no(m_jueces, k_escala):
-  """Algoritmo de fallback: Genera el diccionario de multiplicidades (Omega)
-
-  ordinales adaptado al hiperespacio.
-  """
+  """Algoritmo de fallback: Genera el diccionario de multiplicidades (Omega) ordinales."""
   macro_dict = {}
 
   def _get_bounded_partitions(n, max_len, max_val=None):
@@ -59,83 +46,165 @@ def _build_macrostate_dictionary_no(m_jueces, k_escala):
       for p in _get_bounded_partitions(n - i, max_len - 1, i):
         yield (i,) + p
 
+  # Precalculamos factoriales para acelerar
+  fact = [math.factorial(i) for i in range(m_jueces + 1)]
+
   for p in _get_bounded_partitions(m_jueces, k_escala):
     b = len(p)
     factor_cat = float(math.perm(k_escala, b))
 
     factor_ens = 1.0
     for s, c in Counter(p).items():
-      factor_ens *= math.factorial(s * c) / (
-          (math.factorial(s) ** c) * math.factorial(c)
-      )
+      factor_ens *= fact[s * c] / ((fact[s] ** c) * fact[c])
 
     omega_ce = factor_cat * factor_ens
     macro_dict[tuple(sorted(p, reverse=True))] = omega_ce
 
   return macro_dict
 
-
 # ==============================================================================
 # DETECCIÓN DE ANOMALÍAS ORDINALES Y ESTRUCTURA TERMODINÁMICA
 # ==============================================================================
+def detectar_anomalias_no(matriz_entrada, k_escala=5, umbral_sigma=1.0, no_poblacional=None, modo="infra"):
+    """
+    Detecta anomalías ordinales comparando la frecuencia empírica de cada
+    macroestado (vector de frecuencias de rangos densos) con la esperada bajo azar.
+    """
+    from math import factorial
+    from collections import Counter as _C
 
+    X = np.array(matriz_entrada, dtype=float)
+    X_cat = np.floor(X + 0.5)
+    X_cat = np.clip(X_cat, 1, k_escala)
+    n, m = X.shape
 
-def detectar_anomalias_no(matriz_entrada, k_escala=5, umbral_sigma=1.0):
-  X = np.array(matriz_entrada, dtype=float)
-  X_cat = np.floor(X + 0.5)
-  X_cat = np.clip(X_cat, 1, k_escala)
-  n, m = X.shape
+    # 1. Calcular ranking denso (lógica original de NO)
+    X_sm = X_cat.T
+    sort_idx = np.argsort(X_sm, axis=1)
+    row_idx = np.arange(m)[:, None]
+    sorted_X = X_sm[row_idx, sort_idx]
 
-  X_sm = X_cat.T
-  sort_idx = np.argsort(X_sm, axis=1)
-  row_idx = np.arange(m)[:, None]
-  sorted_X = X_sm[row_idx, sort_idx]
+    diffs = np.diff(sorted_X, axis=1)
+    diffs[np.isnan(diffs)] = 0.0
+    step = np.concatenate([np.zeros((m, 1)), (diffs != 0).astype(int)], axis=1)
+    ranks = np.cumsum(step, axis=1) + 1
 
-  diffs = np.diff(sorted_X, axis=1)
-  diffs[np.isnan(diffs)] = 0.0
-  step = np.concatenate([np.zeros((m, 1)), (diffs != 0).astype(int)], axis=1)
-  ranks = np.cumsum(step, axis=1) + 1
+    inv_sort_idx = np.argsort(sort_idx, axis=1)
+    R_mn = ranks[row_idx, inv_sort_idx].astype(float)
+    R_mn[np.isnan(X.T)] = np.nan
 
-  inv_sort_idx = np.argsort(sort_idx, axis=1)
-  R_mn = ranks[row_idx, inv_sort_idx].astype(float)
-  R_mn[np.isnan(X.T)] = np.nan
+    # 2. Calcular Acuerdo Local por juez
+    R_A = R_mn[:, None, :]
+    R_B = R_mn[None, :, :]
 
-  R_A = R_mn[:, None, :]
-  R_B = R_mn[None, :, :]
+    valid_A = ~np.isnan(R_A)
+    valid_B = ~np.isnan(R_B)
+    eye_mask = ~np.eye(m, dtype=bool)[:, :, None]
 
-  valid_A = ~np.isnan(R_A)
-  valid_B = ~np.isnan(R_B)
-  eye_mask = ~np.eye(m, dtype=bool)[:, :, None]
+    valid_pairs = valid_A & valid_B & eye_mask
+    matches = (R_A == R_B) & valid_pairs
 
-  valid_pairs = valid_A & valid_B & eye_mask
-  matches = (R_A == R_B) & valid_pairs
+    coincidencias_juez = np.sum(matches, axis=(1, 2))
+    emparejamientos_juez = np.sum(valid_pairs, axis=(1, 2))
 
-  coincidencias_juez = np.sum(matches, axis=(1, 2))
-  emparejamientos_juez = np.sum(valid_pairs, axis=(1, 2))
+    acuerdo_local = np.divide(
+        coincidencias_juez,
+        emparejamientos_juez,
+        out=np.full_like(coincidencias_juez, np.nan, dtype=float),
+        where=emparejamientos_juez > 0,
+    )
 
-  acuerdo_local = np.divide(
-      coincidencias_juez,
-      emparejamientos_juez,
-      out=np.full_like(coincidencias_juez, np.nan, dtype=float),
-      where=emparejamientos_juez > 0,
-  )
+    valid = ~np.isnan(acuerdo_local)
+    if not np.any(valid):
+        return pd.DataFrame(), np.nan, np.nan, (np.nan, np.nan)
 
-  valid = ~np.isnan(acuerdo_local)
-  if not np.any(valid):
-    return pd.DataFrame(), np.nan, np.nan, np.nan
+    # 3. Firma de macroestado para cada juez (vector de frecuencias de rangos)
+    firmas = []
+    for j in range(m):
+        col_ranks = R_mn[j]
+        valid_col = col_ranks[~np.isnan(col_ranks)]
+        if len(valid_col) == 0:
+            firmas.append(tuple([0] * k_escala))
+            continue
+        counts_col = _C(int(v) for v in valid_col)
+        # Vector de frecuencias ordenado por rango denso (1..k)
+        firma_vector = tuple(counts_col.get(c, 0) for c in range(1, k_escala + 1))
+        firmas.append(firma_vector)
 
-  mu_global = np.mean(acuerdo_local[valid])
-  sigma_global = np.std(acuerdo_local[valid])
-  limite = mu_global - (umbral_sigma * sigma_global)
-  anomalo = (acuerdo_local < limite) & valid
+    frec_macro = _C(firmas)
+    n_total_jueces = len(firmas)  # m
 
-  df_anomalias = pd.DataFrame({
-      'Juez_ID': np.arange(1, m + 1),
-      'Acuerdo_Local': acuerdo_local,
-      'Es_Anomalo': anomalo,
-  })
-  return df_anomalias, mu_global, sigma_global, limite
+    # 4. Multiplicidad combinatoria Ω (m es el número de sujetos aquí)
+    def _omega_firma(firma):
+        denom = 1
+        for c in firma:
+            denom *= factorial(c)
+        return factorial(n) // denom
 
+    omega_macro = {p: _omega_firma(p) for p in frec_macro.keys()}
+    total_omega = sum(omega_macro.values()) or 1
+
+    # 5. Distribuciones empírica y azar
+    p_emp = {p: frec_macro[p] / n_total_jueces for p in frec_macro}
+    p_azar = {p: omega_macro[p] / total_omega for p in omega_macro}
+
+    eps = 1e-12
+    sobre_rep = {p: (p_emp[p] + eps) / (p_azar[p] + eps) for p in p_emp}
+
+    # 6. NO individual por juez
+    NO_juez = np.sqrt(np.clip(acuerdo_local, 0.0, 1.0))
+
+    # 7. Referencia poblacional (diagnóstico)
+    if no_poblacional is None:
+        from collections import Counter as _C2
+        tuplas = [tuple(int(v) for v in row) for row in X_cat]
+        dict_estados = dict(_C2(tuplas))
+        _, no_pob, _, _ = calcular_estadisticas_no_unificada(
+            dict_estados, k_escala, replicas=200
+        )
+        no_poblacional = no_pob
+
+    # 8. Z-score de log10(sobre_rep)
+    sobre_rep_arr = np.array([sobre_rep[f] for f in firmas])
+    log_sobre = np.log10(sobre_rep_arr + eps)
+
+    media_log = float(np.mean(log_sobre[valid]))
+    std_log = float(np.std(log_sobre[valid]))
+    if std_log < 1e-12:
+        std_log = 1e-12
+
+    z_sobre = (log_sobre - media_log) / std_log
+
+    # Criterio unilateral
+    if modo == "infra":
+        anomalo = valid & (z_sobre < -umbral_sigma)
+    elif modo == "supra":
+        anomalo = valid & (z_sobre > umbral_sigma)
+    else:
+        anomalo = valid & (np.abs(z_sobre) > umbral_sigma)
+
+    # 9. DataFrame de resultados
+    df_anomalias = pd.DataFrame({
+        'Juez_ID': np.arange(1, m + 1),
+        'Acuerdo_Local': acuerdo_local,
+        'NO_Juez': NO_juez,
+        'Macroestado': firmas,  # Vector de frecuencias por rango
+        'Frecuencia': [frec_macro[f] for f in firmas],
+        'P_Empirica': [p_emp[f] for f in firmas],
+        'P_Azar': [p_azar[f] for f in firmas],
+        'Sobre_Rep': sobre_rep_arr,
+        'Z_Sobre': z_sobre,
+        'Es_Anomalo': anomalo,
+    })
+
+    if modo == "infra":
+        z_min, z_max = -umbral_sigma, None
+    elif modo == "supra":
+        z_min, z_max = None, umbral_sigma
+    else:
+        z_min, z_max = -umbral_sigma, umbral_sigma
+
+    return df_anomalias, float(no_poblacional), std_log, (z_min, z_max)
 
 def calcular_suelo_cristal_no(m_jueces, k_escala):
   if m_jueces <= k_escala:
@@ -159,9 +228,7 @@ def calcular_suelo_cristal_no(m_jueces, k_escala):
   return float(np.sqrt(max(0.0, mu_a * (1.0 - sigma_a))))
 
 
-def analizar_termodinamica_no(
-    n_sujetos, m_jueces, k_escala, valor_observado=None
-):
+def analizar_termodinamica_no(n_sujetos, m_jueces, k_escala, valor_observado=None):
   azar_esperado = float(np.sqrt(1.0 / k_escala))
   min_N = calcular_suelo_cristal_no(m_jueces, k_escala)
 
@@ -169,7 +236,6 @@ def analizar_termodinamica_no(
   p_base = (1.0 / k_escala) ** m_jueces
   m_pairs = m_jueces * (m_jueces - 1) / 2.0
 
-  # Lectura optimizada con caché
   macro_dict = get_macrostate_dictionary_no(m_jueces, k_escala)
 
   for p, omega_ce in macro_dict.items():
@@ -288,14 +354,17 @@ def calcular_estadisticas_no_unificada(dict_estados, k_escala, replicas=1000):
     firmas.append(tuple(sorted(counts, reverse=True)))
 
   omega_hoja = np.zeros(U, dtype=float)
+  
+  # Precalcular factoriales para las firmas
+  max_m = max(m, 1)
+  fact = [math.factorial(i) for i in range(max_m + 1)]
+
   for i, f in enumerate(firmas):
     b = len(f)
     factor_cat = float(math.perm(k_escala, b))
     factor_ens = 1.0
     for s, c in Counter(f).items():
-      factor_ens *= math.factorial(s * c) / (
-          (math.factorial(s) ** c) * math.factorial(c)
-      )
+      factor_ens *= fact[s * c] / ((fact[s] ** c) * fact[c])
     omega_hoja[i] = factor_cat * factor_ens
 
   firmas_str = [str(f) for f in firmas]
