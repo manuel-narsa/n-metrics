@@ -1,0 +1,1 @@
+The file "toxicity_individual_annotations(only 1M).csv" is incomplete; it contains only the first million records. However, the file "toxicity_pseudo_annotators_matrix.csv" is the output obtained by processing—using the program "generate_category_matrix.py"—the more than 15 million records contained in the complete file of individual annotations.
