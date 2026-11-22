@@ -2469,6 +2469,7 @@ elif st.session_state["pestaña_activa"] == '📜 Autoría y Licencia':
         st.markdown("### 🎓 How to cite this work")
         st.write("If you use N-Metrics or the N Thermodynamic Framework in your research, please cite the original manuscript:")
         
+        st.info("Narbona-Sarria, M. (2026). The N Framework: Consensus as a State in Configuration Space. Available at Zenodo: https://doi.org/10.5281/zenodo.24426504")
         st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Available at Zenodo: https://doi.org/10.5281/zenodo.20075068")
         st.info("Narbona-Sarria, M. (2026). N, the Natural Concordance Coefficient: The Exact Thermodynamics of Consensus. Available at SSRN: https://ssrn.com/abstract=7119419 or http://dx.doi.org/10.2139/ssrn.7119419")
         
