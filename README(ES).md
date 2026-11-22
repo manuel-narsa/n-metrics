@@ -169,14 +169,7 @@ nmetrics-ordinal-comp
 ### Citación Académica
 Si utiliza N-Framework (`n-metrics`) en sus investigaciones o desarrollos académicos, por favor cite el trabajo según los metadatos de `CITATION.cff`:
 
-```bibtex
-@software{Narbona_Sarria_N-Metrics_The_Exact_2026,
-  author = {Narbona Sarria, Manuel},
-  title = {{N-Metrics: The Exact Thermodynamics of Consensus}},
-  version = {0.8.5},
-  year = {2026},
-  url = {https://github.com/manuel-narsa/n-metrics}
-}
+Narbona-Sarria, M. (2026). The N Framework: Consensus as a State in Configuration Space. Zenodo. https://doi.org/10.5281/zenodo.24426504
 ```
 
 ### Licencia
