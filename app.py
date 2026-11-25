@@ -2085,6 +2085,40 @@ elif st.session_state.get("pestaña_activa") == '📚 BD Diccionarios':
 # PESTAÑA 8: MANUAL DE USUARIO
 # ==============================================================================
 elif st.session_state["pestaña_activa"] == '📖 Manual de Usuario':
+    st.write("") 
+    
+    col1, col2 = st.columns([1, 1])
+    #col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        st.video("https://youtu.be/lbdqjTblE44")
+        #st.video("https://youtu.be/mHQekxmCxH4")
+        #st.video("https://1drv.ms/v/c/08766cf76462b907/IQBYRmIGbJHtSJ-JBO0wuWO_AZmtfI6VRZSjwY1IVxdsH7c?e=kh5Sp8")
+        
+    with col2:
+        st.write(""); st.write(""); st.write(""); st.write("")
+        st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
+        
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        pdf_path = os.path.join(base_dir, "Doc", "N-Metrics_Logic_Blueprint.pdf")
+        
+        if os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as pdf_file:
+                st.download_button(
+                    label="📄 Descargar N-Metrics Logic Blueprint (PDF)",
+                    data=pdf_file,
+                    file_name="N-Metrics_Logic_Blueprint.pdf",
+                    mime="application/pdf",
+                    width='stretch'
+                )
+        else:
+            st.error("⚠️ El manual PDF no se encuentra disponible en el servidor.")
+            st.info(f"🔍 [Depuración] El sistema está buscando el archivo exactamente aquí: `{pdf_path}`")
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+    #with col2:
+    #    st.video("https://youtu.be/BjfPvSKJeXA")
     
     if IDIOMA == "es":
         # --- VERSIÓN EN ESPAÑOL (Idéntica a app_ES.py) ---
